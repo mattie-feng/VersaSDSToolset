@@ -1,0 +1,19 @@
+cluster: cluster
+node:
+ -
+  ip1: 10.203.1.155 # 对应ring0_addr
+  ip2: 10.203.2.155 # 对应ring1_addr
+  hostname: vince1
+  root_password: password
+  port: 22
+
+ -
+  ip1: 10.203.1.156 # 对应ring0_addr
+  ip2: 10.203.2.156 # 对应ring1_addr
+  hostname: manager
+  root_password: password
+  port: 22
+
+
+
+
