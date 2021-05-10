@@ -10,8 +10,7 @@ import action
 monkey.patch_all()
 
 
-timeout = gevent.Timeout(10)
-#
+timeout = gevent.Timeout(30)
 
 
 
@@ -90,6 +89,8 @@ class Scheduler():
                                     nodelist))
 
         gevent.joinall(lst)
+        self.cluster['cluster'] = cluster_name
+        self.conf_file.update_yaml()
 
 
 
@@ -101,7 +102,7 @@ class Scheduler():
         try:
             gevent.joinall(lst)
         except gevent.Timeout:
-            print('执行重启corosync服务超时')
+            print('Restarting corosync service timed out')
         else:
             timeout.close()
 
@@ -128,6 +129,7 @@ class Scheduler():
         return lst
 
 
+    @utils.run_prompt
     def packmaker_conf_change(self):
         cluster_name = self.conf_file.get_cluster_name()
         packmaker = action.Pacemaker()
@@ -142,17 +144,19 @@ class Scheduler():
 
 
     def check_packmaker(self):
-        cluster_name = self.conf_file.get_cluster_name()
+        cluster_name = self.cluster['cluster']
         packmaker = action.Pacemaker()
-        return packmaker.check_crm_conf(cluster_name)
+        if packmaker.check_crm_conf(cluster_name):
+            return [True]*len(self.list_ssh)
+        else:
+            return [False] * len(self.list_ssh)
 
 
 
-
+    @utils.run_prompt
     def targetcli_conf_change(self):
         lst = []
         for ssh in self.list_ssh:
-            print(ssh)
             targetcli = action.TargetCLI(ssh)
             lst.append(gevent.spawn(targetcli.set_auto_add_default_portal))
             lst.append(gevent.spawn(targetcli.set_auto_add_mapped_luns))
@@ -172,6 +176,7 @@ class Scheduler():
         return result
 
 
+    @utils.run_prompt
     def service_set(self):
         lst = []
         for ssh in self.list_ssh:
@@ -207,7 +212,7 @@ class Scheduler():
         return lst
 
 
-
+    @utils.run_prompt
     def replace_ra(self):
         other_node = []
         for ssh,node in zip(self.list_ssh,self.cluster['node']):
@@ -223,4 +228,24 @@ class Scheduler():
         executor.rename_ra()
         for node in other_node:
             executor.scp_ra(node)
+
+
+
+    def check_ra(self):
+        lst = []
+
+        for ssh in self.list_ssh:
+            check_result = []
+            executor = action.RA(ssh)
+            check_result.append(gevent.spawn(executor.check_ra_target))
+            check_result.append(gevent.spawn(executor.check_ra_logicalunit))
+            gevent.joinall(check_result)
+            check_result = [job.value for job in check_result]
+            print(check_result)
+            if all(check_result):
+                lst.append(True)
+            else:
+                lst.append(False)
+
+        return lst
 

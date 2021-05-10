@@ -1,11 +1,12 @@
 import paramiko
-import re
 import yaml
 import socket
 import os
 import subprocess
 import time
 import json
+import prettytable
+from threading import Thread
 
 class SSHConn(object):
 
@@ -52,9 +53,6 @@ class SSHConn(object):
                 pass
             #     print('''Excute command "{}" failed on "{}" with error:
             # "{}"'''.format(command, self._host, err.strip()))
-
-
-
 
 
 class FileEdit():
@@ -139,7 +137,6 @@ class FileEdit():
         return ('\n'.join(text_list))
 
 
-
 class ConfFile():
     def __init__(self):
         self.yaml_file = 'ClusterConf.yaml'
@@ -156,11 +153,10 @@ class ConfFile():
         except TypeError:
             print("Error in the type of file name.")
 
-    def update_yaml(self, dict_a):
+    def update_yaml(self):
         """更新文件内容"""
         with open(self.yaml_file, 'w', encoding='utf-8') as f:
-            # yaml.dump(dict_a, f, default_flow_style=False)
-            yaml.dump(dict_a, f)
+            yaml.dump(self.cluster, f)
 
 
 
@@ -206,6 +202,20 @@ class ConfFile():
         return str_nodelist
 
 
+class Table():
+    def __init__(self):
+        self.header = None
+        self.data = None
+        self.table = prettytable.PrettyTable()
+
+    def add_data(self,list_data):
+        self.table.add_row(list_data)
+
+
+    def print_table(self):
+        self.table.field_names = self.header
+        print(self.table)
+
 
 
 def get_host_ip():
@@ -245,3 +255,15 @@ def exec_cmd(cmd,conn=None):
         result = result.rstrip('\n')
     return result
 
+
+
+def run_prompt(f):
+    def wrapper(*args, **kwargs):
+        thr = Thread(target=f, args=args, kwargs=kwargs)
+        thr.start()
+        while thr.is_alive():
+            time.sleep(1)
+            print('.',end='')
+        print('\n',end='')
+
+    return wrapper

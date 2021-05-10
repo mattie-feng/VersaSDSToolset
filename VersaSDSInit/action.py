@@ -1,14 +1,12 @@
-import os
-import json
 import time
 import sys
 import utils
 import re
-from ssh_authorized import SSHAuthorize
+from threading import Thread
 
 corosync_conf_path = '/etc/corosync/corosync.conf'
 read_data = 'corosync.conf'
-# corosync_conf_path = '/home/samba/corosync.conf'
+
 
 
 
@@ -24,7 +22,6 @@ class Host():
         utils.exec_cmd(cmd1,self.conn)
         time.sleep(0)
         utils.exec_cmd(cmd2,self.conn)
-
 
     def check_hostname(self,hostname):
         lc_hostname = utils.exec_cmd('hostname',self.conn)
@@ -50,7 +47,7 @@ class Host():
         authorized_keys = utils.exec_cmd('cat /root/.ssh/authorized_keys')
         time.sleep(0)
         hosts = re.findall('ssh-rsa\s[\s\S]*?\sroot@(.*)', authorized_keys)
-        if set(cluster_hosts) == set(hosts):
+        if set(cluster_hosts) <= set(hosts):
             return True
 
 
@@ -330,39 +327,53 @@ class RA():
     def __init__(self,conn=None):
         self.conn = conn
         self.ra_path = self._get_ra_path()
-        self.target_path = '/usr/lib/ocf/resource.d/heartbeat'
+        self.heartbeat_path = '/usr/lib/ocf/resource.d/heartbeat'
         self.ra_target = 'iSCSITarget.mod_cache_gena_acl_0'
         self.ra_logicalunit = 'iSCSILogicalUnit.450_patch1476_mod'
 
 
     def backup_iscsilogicalunit(self):
-        cmd = f'mv {self.target_path}/iSCSILogicalUnit {self.target_path}/iSCSILogicalUnit.bak'
-        if bool(utils.exec_cmd(f'[ -f {self.target_path}/iSCSILogicalUnit ] && echo True',self.conn)):
+        cmd = f'mv {self.heartbeat_path}/iSCSILogicalUnit {self.heartbeat_path}/iSCSILogicalUnit.bak'
+        if bool(utils.exec_cmd(f'[ -f {self.heartbeat_path}/iSCSILogicalUnit ] && echo True',self.conn)):
             utils.exec_cmd(cmd,self.conn)
 
 
     def backup_iscsitarget(self):
-        cmd = f'mv {self.target_path}/iSCSITarget {self.target_path}/iSCSITarget.bak'
-        if bool(utils.exec_cmd(f'[ -f {self.target_path}/iSCSITarget ] && echo True',self.conn)):
+        cmd = f'mv {self.heartbeat_path}/iSCSITarget {self.heartbeat_path}/iSCSITarget.bak'
+        if bool(utils.exec_cmd(f'[ -f {self.heartbeat_path}/iSCSITarget ] && echo True',self.conn)):
             utils.exec_cmd(cmd,self.conn)
 
     def cp_ra(self):
-        cmd = 'cp %s/* %s/'%(self.ra_path,self.target_path)
+        cmd = 'cp %s/* %s/'%(self.ra_path,self.heartbeat_path)
         utils.exec_cmd(cmd,self.conn)
 
     def rename_ra(self):
-        cmd = f'mv {self.target_path}/{self.ra_target} {self.target_path}/iSCSITarget;' \
-            f'mv {self.target_path}/{self.ra_logicalunit} {self.target_path}/iSCSILogicalUnit'
+        cmd = f'mv {self.heartbeat_path}/{self.ra_target} {self.heartbeat_path}/iSCSITarget;' \
+            f'mv {self.heartbeat_path}/{self.ra_logicalunit} {self.heartbeat_path}/iSCSILogicalUnit'
 
-        if bool(utils.exec_cmd(f'[ -f {self.target_path}/{self.ra_logicalunit} ] && echo True')) \
-                and bool(utils.exec_cmd(f'[ -f {self.target_path}/{self.ra_logicalunit} ] && echo True')):
+        if bool(utils.exec_cmd(f'[ -f {self.heartbeat_path}/{self.ra_logicalunit} ] && echo True')) \
+                and bool(utils.exec_cmd(f'[ -f {self.heartbeat_path}/{self.ra_logicalunit} ] && echo True')):
             utils.exec_cmd(cmd)
 
 
     def scp_ra(self,hostname):
-        cmd = f'scp {self.target_path}/iSCSITarget iSCSILogicalUnit {hostname}:{self.target_path}/'
-        print(cmd)
+        cmd = f'scp {self.heartbeat_path}/iSCSITarget {self.heartbeat_path}/iSCSILogicalUnit {hostname}:{self.heartbeat_path}/'
         utils.exec_cmd(cmd,self.conn)
+
+
+
+    def check_ra_logicalunit(self):
+        cmd = f'grep -rs "#{self.ra_logicalunit}" {self.heartbeat_path}/iSCSILogicalUnit'
+        result = utils.exec_cmd(cmd,self.conn)
+        if result:
+            return True
+
+
+    def check_ra_target(self):
+        cmd = f'grep -rs "#{self.ra_target}" {self.heartbeat_path}/iSCSITarget'
+        result = utils.exec_cmd(cmd,self.conn)
+        if result:
+            return True
 
 
     def _get_ra_path(self):
@@ -371,6 +382,7 @@ class RA():
         list_path_now.append('RA')
         ra_path = '/'.join(list_path_now)
         return ra_path
+
 
 
 
