@@ -30,9 +30,10 @@ class VersaSDSInit():
             help='starting program',
         )
 
-        # parser_run.add_argument(
-        #     '--corosync',
-        #     help='Only do corosync work')
+        # 可增加独项的
+        parser_run.add_argument(
+            '--corosync',
+            help='Only do corosync work')
 
 
         parser_run.set_defaults(func=self.run)
@@ -52,11 +53,13 @@ class VersaSDSInit():
 
     def run(self,args):
         controller = control.Scheduler()
+        print('*start*')
+
         controller.get_ssh_conn()
         print('start to modify hostname')
-        # controller.modify_hostname()
+        controller.modify_hostname()
         print('start to build ssh connect')
-        # controller.ssh_conn_build() # ssh免密授权
+        controller.ssh_conn_build() # ssh免密授权
         print('start to synchronised time')
         controller.sync_time()
         print('start to set up corosync')
@@ -64,6 +67,7 @@ class VersaSDSInit():
         print('start to restart corosync')
         controller.restart_corosync()
 
+        print('check corosync, please wait')
         if all(controller.check_corosync()):
             print('start to set up packmaker')
             controller.packmaker_conf_change()
@@ -92,6 +96,7 @@ class VersaSDSInit():
             print('RA replace failed')
             sys.exit()
 
+        print('*success*')
 
     def show(self,args):
         controller = control.Scheduler()
@@ -114,7 +119,7 @@ class VersaSDSInit():
 
         table.print_table()
 
-    #
+
     def print_help(self,*args):
         self.parser.print_help()
 
@@ -138,4 +143,8 @@ def main():
 
 
 if __name__  == '__main__':
+    # sc = control.Scheduler()
+    # sc.get_ssh_conn()
+    # sc.modify_hostname()
+    # sc.ssh_conn_build()
     main()

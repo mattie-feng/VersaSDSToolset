@@ -7,6 +7,7 @@ import time
 import json
 import prettytable
 from threading import Thread
+from functools import wraps
 
 class SSHConn(object):
 
@@ -156,16 +157,14 @@ class ConfFile():
     def update_yaml(self):
         """更新文件内容"""
         with open(self.yaml_file, 'w', encoding='utf-8') as f:
-            yaml.dump(self.cluster, f)
-
+            yaml.dump(self.cluster, f,default_flow_style=False)
 
 
     def get_ssh_conn_data(self):
         lst = []
         for node in self.cluster:
-            lst.append([node['ip1'],node['port'], 'root', node['root_password']])
+            lst.append([node['public_ip'],node['port'], 'root', node['root_password']])
         return lst
-
 
 
     def get_cluster_name(self):
@@ -175,11 +174,11 @@ class ConfFile():
 
     def get_bindnetaddr(self):
         node = self.cluster['node'][0]
-        list_ip1 = node['ip1'].split('.')
-        bindnetaddr1 = f"{'.'.join(list_ip1[:3])}.0"
+        list_public_ip = node['public_ip'].split('.')
+        bindnetaddr1 = f"{'.'.join(list_public_ip[:3])}.0"
 
-        list_ip2 = node['ip2'].split('.')
-        bindnetaddr2 = f"{'.'.join(list_ip2[:3])}.0"
+        list_private_ip = node['private_ip']['ip'].split('.')
+        bindnetaddr2 = f"{'.'.join(list_private_ip[:3])}.0"
 
         return [bindnetaddr1,bindnetaddr2]
 
@@ -193,7 +192,7 @@ class ConfFile():
         str_node_all = ""
         for node in self.cluster['node']:
             str_node = "node "
-            dict_node = {'ring0_addr':node['ip1'],'ring1_addr':node['ip2'],'name':node['hostname']}
+            dict_node = {'ring0_addr':node['public_ip'],'ring1_addr':node['private_ip']['ip'],'name':node['hostname']}
             str_node += json.dumps(dict_node, indent=4, separators=(',', ': '))
             str_node = FileEdit.remove_comma(str_node)
             str_node_all += str_node + '\n'
@@ -257,13 +256,26 @@ def exec_cmd(cmd,conn=None):
 
 
 
-def run_prompt(f):
-    def wrapper(*args, **kwargs):
-        thr = Thread(target=f, args=args, kwargs=kwargs)
-        thr.start()
-        while thr.is_alive():
-            time.sleep(1)
-            print('.',end='')
-        print('\n',end='')
 
+class RunPrompt():
+    flag = True
+
+    def run(self,func,*args,**kwargs):
+        thr = Thread(target=func, args=args, kwargs=kwargs)
+        thr.start()
+        while RunPrompt.flag:
+            time.sleep(1)
+            print('.',end='',flush=True)
+        print('\n',end='')
+        RunPrompt.flag = True
+
+    @staticmethod
+    def terminate():
+        RunPrompt.flag = False
+
+
+def deco_prompt(func):
+    @wraps(func)
+    def wrapper(self):
+        RunPrompt().run(func,self)
     return wrapper

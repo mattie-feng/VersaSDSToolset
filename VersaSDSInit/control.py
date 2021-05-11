@@ -1,6 +1,7 @@
 import sys
 import gevent
 from gevent import monkey
+import time
 
 from ssh_authorized import SSHAuthorizeNoMGN
 import utils
@@ -10,7 +11,7 @@ import action
 monkey.patch_all()
 
 
-timeout = gevent.Timeout(30)
+timeout = gevent.Timeout(60)
 
 
 
@@ -24,28 +25,42 @@ class Scheduler():
         self.cluster = self.conf_file.cluster
         self.list_ssh = []
 
-
     def get_ssh_conn(self):
         ssh = SSHAuthorizeNoMGN()
         local_ip = utils.get_host_ip()
         for node in self.cluster['node']:
-            if local_ip == node['ip1']:
+            if local_ip == node['public_ip']:
                 self.list_ssh.append(None)
             else:
-                self.list_ssh.append(ssh.make_connect(node['ip1'],node['port'],'root',node['root_password']))
+                self.list_ssh.append(ssh.make_connect(node['public_ip'],node['port'],'root',node['root_password']))
 
         return self.list_ssh
 
-
+    @utils.deco_prompt
     def modify_hostname(self):
         lst = []
-        for ssh,node in zip(self.list_ssh,self.cluster['node']):
-            lst.append(gevent.spawn(action.Host(ssh).modify_hostname,node['hostname']))
-        gevent.joinall(lst)
+        hosts_file = []
 
+        for node in self.cluster['node']:
+            hosts_file.append({'ip': node['public_ip'], 'hostname': node['hostname']})
+
+        for ssh,node in zip(self.list_ssh,self.cluster['node']):
+            executor = action.Host(ssh)
+            lst.append(gevent.spawn(executor.modify_hostname,node['hostname']))
+            lst.append(gevent.spawn(executor.modify_hostsfile,'127.0.1.1',node['hostname']))
+            for host in hosts_file:
+                lst.append(gevent.spawn(executor.modify_hostsfile,host['ip'],host['hostname']))
+
+        gevent.joinall(lst)
+        utils.RunPrompt.terminate()
+
+
+
+    @utils.deco_prompt
     def ssh_conn_build(self):
         ssh = SSHAuthorizeNoMGN()
         ssh.init_cluster_no_mgn('cluster',self.cluster['node'],self.list_ssh)
+        utils.RunPrompt.terminate()
 
     def check_hostname(self):
         lst = []
@@ -53,7 +68,7 @@ class Scheduler():
             lst.append(gevent.spawn(action.Host(ssh).check_hostname,node['hostname']))
         gevent.joinall(lst)
         result = [job.value for job in lst]
-        return result #[True, True, True, True]
+        return result
 
 
     def check_ssh_authorized(self):
@@ -65,19 +80,22 @@ class Scheduler():
         result = [job.value for job in lst]
         return result
 
-
+    @utils.deco_prompt
     def sync_time(self):
         lst = []
         for ssh in self.list_ssh:
             lst.append(gevent.spawn(action.Corosync(ssh).sync_time))
         gevent.joinall(lst)
+        utils.RunPrompt.terminate()
 
 
 
+
+    @utils.deco_prompt
     def corosync_conf_change(self):
         lst = []
         cluster_name = self.conf_file.get_cluster_name()
-        bindnetaddr = self.conf_file.get_bindnetaddr()[1]
+        bindnetaddr = self.conf_file.get_bindnetaddr()[0]
         interface = self.conf_file.get_inferface()
         nodelist = self.conf_file.get_nodelist()
 
@@ -89,11 +107,10 @@ class Scheduler():
                                     nodelist))
 
         gevent.joinall(lst)
-        self.cluster['cluster'] = cluster_name
-        self.conf_file.update_yaml()
+        utils.RunPrompt.terminate()
 
 
-
+    @utils.deco_prompt
     def restart_corosync(self):
         lst = []
         timeout.start()
@@ -106,8 +123,11 @@ class Scheduler():
         else:
             timeout.close()
 
+        utils.RunPrompt.terminate()
+
 
     def check_corosync(self):
+        time.sleep(5)
         nodes = [node['hostname'] for node in self.cluster['node']]
         lst_ring_status = []
         lst_cluster_status = []
@@ -125,11 +145,10 @@ class Scheduler():
                 lst.append(True)
             else:
                 lst.append(False)
-
         return lst
 
 
-    @utils.run_prompt
+    @utils.deco_prompt
     def packmaker_conf_change(self):
         cluster_name = self.conf_file.get_cluster_name()
         packmaker = action.Pacemaker()
@@ -141,6 +160,9 @@ class Scheduler():
         lst.append(gevent.spawn(packmaker.modify_stonith_enabled))
 
         gevent.joinall(lst)
+        self.conf_file.cluster['cluster'] = cluster_name
+        self.conf_file.update_yaml()
+        utils.RunPrompt.terminate()
 
 
     def check_packmaker(self):
@@ -153,7 +175,7 @@ class Scheduler():
 
 
 
-    @utils.run_prompt
+    @utils.deco_prompt
     def targetcli_conf_change(self):
         lst = []
         for ssh in self.list_ssh:
@@ -163,6 +185,7 @@ class Scheduler():
             lst.append(gevent.spawn(targetcli.set_auto_enable_tpgt))
 
         gevent.joinall(lst)
+        utils.RunPrompt.terminate()
 
 
     def check_targetcli(self):
@@ -176,7 +199,7 @@ class Scheduler():
         return result
 
 
-    @utils.run_prompt
+    @utils.deco_prompt
     def service_set(self):
         lst = []
         for ssh in self.list_ssh:
@@ -189,6 +212,7 @@ class Scheduler():
             lst.append(gevent.spawn(executor.set_enable_corosync))
 
         gevent.joinall(lst)
+        utils.RunPrompt.terminate()
 
 
 
@@ -212,7 +236,7 @@ class Scheduler():
         return lst
 
 
-    @utils.run_prompt
+    @utils.deco_prompt
     def replace_ra(self):
         other_node = []
         for ssh,node in zip(self.list_ssh,self.cluster['node']):
@@ -228,6 +252,7 @@ class Scheduler():
         executor.rename_ra()
         for node in other_node:
             executor.scp_ra(node)
+        utils.RunPrompt.terminate()
 
 
 
@@ -241,7 +266,6 @@ class Scheduler():
             check_result.append(gevent.spawn(executor.check_ra_logicalunit))
             gevent.joinall(check_result)
             check_result = [job.value for job in check_result]
-            print(check_result)
             if all(check_result):
                 lst.append(True)
             else:
