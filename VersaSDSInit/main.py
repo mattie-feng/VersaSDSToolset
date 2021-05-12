@@ -56,6 +56,8 @@ class VersaSDSInit():
         print('*start*')
 
         controller.get_ssh_conn()
+        print('start to set private ip')
+        control.set_ip_on_device()
         print('start to modify hostname')
         controller.modify_hostname()
         print('start to build ssh connect')
@@ -140,6 +142,7 @@ def main():
         sys.stderr.write("\nClient exiting (received SIGINT)\n")
     except PermissionError:
         sys.stderr.write("\nPermission denied (log file or other)\n")
+
 
 
 if __name__  == '__main__':
