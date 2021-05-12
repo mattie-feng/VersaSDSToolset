@@ -128,7 +128,7 @@ class SSHAuthorize:
         print('config_is_exist:',config_is_exist)
         # 这里不要输入 -e 参数,转不转义都可以
         if not config_is_exist:
-            os.system("echo 'StrictHostKeyChecking no\\nUserKnownHostsFile /dev/null' >> ~/.ssh/config ")
+            os.system("echo 'StrictHostKeyChecking no\nUserKnownHostsFile /dev/null' >> ~/.ssh/config ")
         public_key = os.popen('cat /root/.ssh/id_rsa.pub').read()
         return public_key
 
@@ -426,20 +426,20 @@ class SSHAuthorizeNoMGN(SSHAuthorize):
     def get_public_key(conn):
         # 已存在会提示是否覆盖，需要提前判断文件是否存在
         # 初始化节点ssh服务的（输入参数SSHClient连接对象，输出参数SSHClient连接对象）
-        rsa_is_exist = bool(utils.exec_cmd('[ -f /root/.ssh/id_rsa.pub ] && echo True',conn))
-        print(utils.exec_cmd('[ -f /root/.ssh/id_rsa.pub ] && echo True',conn))
+        rsa_pub_is_exist = bool(utils.exec_cmd('[ -f /root/.ssh/id_rsa.pub ] && echo True',conn))
+        rsa_is_exist = bool(utils.exec_cmd('[ -f /root/.ssh/id_rsa ] && echo True',conn))
         # 执行生成密钥操作
-        if not rsa_is_exist:
-            print(conn)
-            # conn.exec_cmd('ssh-keygen -f /root/.ssh/id_rsa -N ""')
-            # conn.exec_command('ssh-keygen -f /root/.ssh/id_rsa -N ""')
+        if not rsa_pub_is_exist:
+            if rsa_is_exist:
+                print('id_rsa 存在, 请先进行处理')
+                sys.exit()
             utils.exec_cmd('ssh-keygen -f /root/.ssh/id_rsa -N ""',conn)
         # 要有停顿时间，不然public_key还未写入
         time.sleep(2)
         # 注意 /.ssh/config 文件
         config_is_exist = bool(utils.exec_cmd('[ -f /root/.ssh/config ] && echo True',conn))
         if not config_is_exist:
-            utils.exec_cmd("echo 'StrictHostKeyChecking no\\nUserKnownHostsFile /dev/null' >> ~/.ssh/config ",conn)
+            utils.exec_cmd("echo 'StrictHostKeyChecking no\nUserKnownHostsFile /dev/null' >> ~/.ssh/config ",conn)
         public_key = utils.exec_cmd('cat /root/.ssh/id_rsa.pub',conn)
         public_key = public_key.decode() if isinstance(public_key,bytes) else public_key
         return public_key.strip()
@@ -479,19 +479,19 @@ class SSHAuthorizeNoMGN(SSHAuthorize):
         """
         if self.cluster_is_exist('Cluster', cluster_name):
             print('this cluster name is exist')
-            sys.exit()
+            return
 
         for node,ssh in zip(cluster_data,list_ssh):
             public_key = self.get_public_key(ssh)
             hostname = self.get_hostname(ssh)
             # 逐个节点存放 ip-主机名 列表
-            self.hosts_to_add.append([node['ip1'], hostname])
+            self.hosts_to_add.append([node['public_ip'], hostname])
             # 逐个节点存放 主机名-公钥 字典
             self.keys_to_add.update({hostname: f'{public_key}'})
 
         # 公钥信息放进本地配置文件
         self.set_all_public_keys_by_cluster(cluster_name, self.keys_to_add)
-        # hosts 信息放进本地配置文件
+        # hosts 信息放进本地配置文
         self.set_all_hosts_by_cluster(cluster_name, self.hosts_to_add)
         # 分发该集群公钥信息通过 ssh 连接对象
         self.distribute_all_keys_by_connect_via_user(cluster_name,list_ssh)

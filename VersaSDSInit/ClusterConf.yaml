@@ -1,19 +1,18 @@
-cluster: cluster
+cluster: cluster_210511
 node:
- -
-  ip1: 10.203.1.155 # 对应ring0_addr
-  ip2: 10.203.2.155 # 对应ring1_addr
-  hostname: vince1
-  root_password: password
+- hostname: vince2
   port: 22
-
- -
-  ip1: 10.203.1.156 # 对应ring0_addr
-  ip2: 10.203.2.156 # 对应ring1_addr
-  hostname: manager
+  private_ip:
+    device: ens192
+    gateway: 10.203.2.1
+    ip: 10.203.2.157
+  public_ip: 10.203.1.157
   root_password: password
+- hostname: vince4
   port: 22
-
-
-
-
+  private_ip:
+    device: ens192
+    gateway: 10.203.2.1
+    ip: 10.203.2.159
+  public_ip: 10.203.1.159
+  root_password: password

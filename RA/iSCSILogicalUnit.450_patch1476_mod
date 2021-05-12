@@ -29,6 +29,7 @@
 #
 
 #######################################################################
+#iSCSILogicalUnit.450_patch1476_mod
 # Initialization:
 : ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
 . ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs

@@ -1,11 +1,13 @@
 import paramiko
-import re
 import yaml
 import socket
 import os
 import subprocess
 import time
 import json
+import prettytable
+from threading import Thread
+from functools import wraps
 
 class SSHConn(object):
 
@@ -52,9 +54,6 @@ class SSHConn(object):
                 pass
             #     print('''Excute command "{}" failed on "{}" with error:
             # "{}"'''.format(command, self._host, err.strip()))
-
-
-
 
 
 class FileEdit():
@@ -139,7 +138,6 @@ class FileEdit():
         return ('\n'.join(text_list))
 
 
-
 class ConfFile():
     def __init__(self):
         self.yaml_file = 'ClusterConf.yaml'
@@ -156,20 +154,17 @@ class ConfFile():
         except TypeError:
             print("Error in the type of file name.")
 
-    def update_yaml(self, dict_a):
+    def update_yaml(self):
         """更新文件内容"""
         with open(self.yaml_file, 'w', encoding='utf-8') as f:
-            # yaml.dump(dict_a, f, default_flow_style=False)
-            yaml.dump(dict_a, f)
-
+            yaml.dump(self.cluster, f,default_flow_style=False)
 
 
     def get_ssh_conn_data(self):
         lst = []
         for node in self.cluster:
-            lst.append([node['ip1'],node['port'], 'root', node['root_password']])
+            lst.append([node['public_ip'],node['port'], 'root', node['root_password']])
         return lst
-
 
 
     def get_cluster_name(self):
@@ -179,11 +174,11 @@ class ConfFile():
 
     def get_bindnetaddr(self):
         node = self.cluster['node'][0]
-        list_ip1 = node['ip1'].split('.')
-        bindnetaddr1 = f"{'.'.join(list_ip1[:3])}.0"
+        list_public_ip = node['public_ip'].split('.')
+        bindnetaddr1 = f"{'.'.join(list_public_ip[:3])}.0"
 
-        list_ip2 = node['ip2'].split('.')
-        bindnetaddr2 = f"{'.'.join(list_ip2[:3])}.0"
+        list_private_ip = node['private_ip']['ip'].split('.')
+        bindnetaddr2 = f"{'.'.join(list_private_ip[:3])}.0"
 
         return [bindnetaddr1,bindnetaddr2]
 
@@ -197,7 +192,7 @@ class ConfFile():
         str_node_all = ""
         for node in self.cluster['node']:
             str_node = "node "
-            dict_node = {'ring0_addr':node['ip1'],'ring1_addr':node['ip2'],'name':node['hostname']}
+            dict_node = {'ring0_addr':node['public_ip'],'ring1_addr':node['private_ip']['ip'],'name':node['hostname']}
             str_node += json.dumps(dict_node, indent=4, separators=(',', ': '))
             str_node = FileEdit.remove_comma(str_node)
             str_node_all += str_node + '\n'
@@ -205,6 +200,20 @@ class ConfFile():
         str_nodelist = "nodelist {\n%s\n}"%str_node_all
         return str_nodelist
 
+
+class Table():
+    def __init__(self):
+        self.header = None
+        self.data = None
+        self.table = prettytable.PrettyTable()
+
+    def add_data(self,list_data):
+        self.table.add_row(list_data)
+
+
+    def print_table(self):
+        self.table.field_names = self.header
+        print(self.table)
 
 
 
@@ -245,3 +254,28 @@ def exec_cmd(cmd,conn=None):
         result = result.rstrip('\n')
     return result
 
+
+
+
+class RunPrompt():
+    flag = True
+
+    def run(self,func,*args,**kwargs):
+        thr = Thread(target=func, args=args, kwargs=kwargs)
+        thr.start()
+        while RunPrompt.flag:
+            time.sleep(1)
+            print('.',end='',flush=True)
+        print('\n',end='')
+        RunPrompt.flag = True
+
+    @staticmethod
+    def terminate():
+        RunPrompt.flag = False
+
+
+def deco_prompt(func):
+    @wraps(func)
+    def wrapper(self):
+        RunPrompt().run(func,self)
+    return wrapper
