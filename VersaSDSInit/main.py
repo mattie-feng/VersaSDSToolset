@@ -57,7 +57,7 @@ class VersaSDSInit():
 
         controller.get_ssh_conn()
         print('start to set private ip')
-        control.set_ip_on_device()
+        controller.set_ip_on_device()
         print('start to modify hostname')
         controller.modify_hostname()
         print('start to build ssh connect')
