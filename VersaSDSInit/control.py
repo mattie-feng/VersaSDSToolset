@@ -6,6 +6,7 @@ import time
 from ssh_authorized import SSHAuthorizeNoMGN
 import utils
 import action
+import time
 
 # 协程相关的补丁
 monkey.patch_all()
@@ -273,3 +274,29 @@ class Scheduler():
 
         return lst
 
+    def set_ip_on_device(self):
+        lst_set = []
+
+        for ssh, node in zip(self.list_ssh, self.cluster['node']):
+            ip_service = action.IpService(ssh)
+            lst_set.append(gevent.spawn(ip_service.set_ip, node['private_ip']['device'], node['private_ip']['ip'], node['private_ip']['gateway']))
+        gevent.joinall(lst_set)
+        self.up_ip_service()
+        print("Finish to set ip")
+
+    def modify_ip_on_device(self):
+        lst_modify = []
+
+        for ssh, node in zip(self.list_ssh, self.cluster['node']):
+            ip_service = action.IpService(ssh)
+            lst_modify.append(gevent.spawn(ip_service.modify_ip, node['private_ip']['device'], node['private_ip']['ip'], node['private_ip']['gateway']))
+        gevent.joinall(lst_modify)
+        self.up_ip_service()
+        print("Finish to modify ip")
+
+    def up_ip_service(self):
+        lst_up = []
+        for ssh, node in zip(self.list_ssh, self.cluster['node']):
+            ip_service = action.IpService(ssh)
+            lst_up.append(gevent.spawn(ip_service.up_ip_service, node['private_ip']['device']))
+        gevent.joinall(lst_up)

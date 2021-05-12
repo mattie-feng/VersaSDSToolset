@@ -8,6 +8,24 @@ corosync_conf_path = '/etc/corosync/corosync.conf'
 read_data = 'corosync.conf'
 
 
+class IpService(object):
+    def __init__(self, conn=None):
+        self.conn = conn
+
+    def set_ip(self, device, ip, gateway, netmask=24):
+        connection_name = 'vtel_' + device
+        cmd = f"nmcli connection add con-name {connection_name} type ethernet ifname {device} ipv4.addresses {ip}/{netmask} ipv4.gateway {gateway} ipv4.method manual"
+        utils.exec_cmd(cmd, self.conn)
+
+    def up_ip_service(self, device):
+        connection_name = 'vtel_' + device
+        cmd = f"nmcli connection up id {connection_name}"
+        utils.exec_cmd(cmd, self.conn)
+
+    def modify_ip(self, device, new_ip, gateway, netmask=24):
+        connection_name = 'vtel_' + device
+        cmd = f"nmcli connection modify {connection_name} ipv4.address {new_ip}/{netmask} ipv4.gateway {gateway}"
+        utils.exec_cmd(cmd, self.conn)
 
 
 class Host():
@@ -375,4 +393,6 @@ class RA():
         list_path_now.append('RA')
         ra_path = '/'.join(list_path_now)
         return ra_path
+
+
 
