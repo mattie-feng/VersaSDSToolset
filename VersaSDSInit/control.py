@@ -1,12 +1,9 @@
-import sys
 import gevent
 from gevent import monkey
-import time
 
 from ssh_authorized import SSHAuthorizeNoMGN
 import utils
 import action
-import time
 
 # 协程相关的补丁
 monkey.patch_all()
@@ -37,7 +34,6 @@ class Scheduler():
 
         return self.list_ssh
 
-    @utils.deco_prompt
     def modify_hostname(self):
         lst = []
         hosts_file = []
@@ -53,15 +49,11 @@ class Scheduler():
                 lst.append(gevent.spawn(executor.modify_hostsfile,host['ip'],host['hostname']))
 
         gevent.joinall(lst)
-        utils.RunPrompt.terminate()
 
 
-
-    @utils.deco_prompt
     def ssh_conn_build(self):
         ssh = SSHAuthorizeNoMGN()
         ssh.init_cluster_no_mgn('cluster',self.cluster['node'],self.list_ssh)
-        utils.RunPrompt.terminate()
 
     def check_hostname(self):
         lst = []
@@ -81,18 +73,14 @@ class Scheduler():
         result = [job.value for job in lst]
         return result
 
-    @utils.deco_prompt
     def sync_time(self):
         lst = []
         for ssh in self.list_ssh:
             lst.append(gevent.spawn(action.Corosync(ssh).sync_time))
         gevent.joinall(lst)
-        utils.RunPrompt.terminate()
 
 
 
-
-    @utils.deco_prompt
     def corosync_conf_change(self):
         lst = []
         cluster_name = self.conf_file.get_cluster_name()
@@ -108,10 +96,8 @@ class Scheduler():
                                     nodelist))
 
         gevent.joinall(lst)
-        utils.RunPrompt.terminate()
 
 
-    @utils.deco_prompt
     def restart_corosync(self):
         lst = []
         timeout.start()
@@ -124,11 +110,9 @@ class Scheduler():
         else:
             timeout.close()
 
-        utils.RunPrompt.terminate()
 
 
     def check_corosync(self):
-        time.sleep(5)
         nodes = [node['hostname'] for node in self.cluster['node']]
         lst_ring_status = []
         lst_cluster_status = []
@@ -149,7 +133,6 @@ class Scheduler():
         return lst
 
 
-    @utils.deco_prompt
     def packmaker_conf_change(self):
         cluster_name = self.conf_file.get_cluster_name()
         packmaker = action.Pacemaker()
@@ -163,7 +146,6 @@ class Scheduler():
         gevent.joinall(lst)
         self.conf_file.cluster['cluster'] = cluster_name
         self.conf_file.update_yaml()
-        utils.RunPrompt.terminate()
 
 
     def check_packmaker(self):
@@ -176,7 +158,6 @@ class Scheduler():
 
 
 
-    @utils.deco_prompt
     def targetcli_conf_change(self):
         lst = []
         for ssh in self.list_ssh:
@@ -186,7 +167,6 @@ class Scheduler():
             lst.append(gevent.spawn(targetcli.set_auto_enable_tpgt))
 
         gevent.joinall(lst)
-        utils.RunPrompt.terminate()
 
 
     def check_targetcli(self):
@@ -200,7 +180,6 @@ class Scheduler():
         return result
 
 
-    @utils.deco_prompt
     def service_set(self):
         lst = []
         for ssh in self.list_ssh:
@@ -213,7 +192,6 @@ class Scheduler():
             lst.append(gevent.spawn(executor.set_enable_corosync))
 
         gevent.joinall(lst)
-        utils.RunPrompt.terminate()
 
 
 
@@ -237,7 +215,6 @@ class Scheduler():
         return lst
 
 
-    @utils.deco_prompt
     def replace_ra(self):
         other_node = []
         for ssh,node in zip(self.list_ssh,self.cluster['node']):
@@ -253,7 +230,6 @@ class Scheduler():
         executor.rename_ra()
         for node in other_node:
             executor.scp_ra(node)
-        utils.RunPrompt.terminate()
 
 
 

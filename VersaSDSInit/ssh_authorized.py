@@ -19,13 +19,15 @@ class SSHAuthorize:
 
     def read_config(self):
         try:
-            cluster_info = open(sys.path[0] + "/config.json", encoding='utf-8')
+            # cluster_info = open(sys.path[0] + "/config.json", encoding='utf-8')
+            cluster_info = open("./config.json", encoding='utf-8')
             json_dict = json.load(cluster_info)
             cluster_info.close()
             return json_dict
 
         except FileNotFoundError:
-            with open(sys.path[0] + "/config.json", "w") as fw:
+            # with open(sys.path[0] + "/config.json", "w") as fw:
+            with open("./config.json", "w") as fw:
                 json_dict = {
                     "Cluster": {}}
                 json.dump(json_dict, fw, indent=4, separators=(',', ': '))
@@ -35,7 +37,8 @@ class SSHAuthorize:
             sys.exit()
 
     def commit_data(self):
-        with open(sys.path[0] + "/config.json", "w") as fw:
+        # with open(sys.path[0] + "/config.json", "w") as fw:
+        with open("./config.json", "w") as fw:
             json.dump(self.cluster_info, fw, indent=4, separators=(',', ': '))
         return self.cluster_info
 

@@ -1,11 +1,9 @@
 import time
-import sys
 import utils
 import re
-from threading import Thread
 
 corosync_conf_path = '/etc/corosync/corosync.conf'
-read_data = 'corosync.conf'
+read_data = './corosync.conf'
 
 
 class IpService(object):
@@ -91,7 +89,8 @@ class Corosync():
 
 
     def change_corosync_conf(self,cluster_name,bindnetaddr,interface,nodelist):
-        editor = utils.FileEdit(corosync_conf_path) # 读取原配置文件数据
+        # editor = utils.FileEdit(corosync_conf_path) # 读取原配置文件数据
+        editor = utils.FileEdit(read_data)
 
         editor.replace_data(f"cluster_name: {self.original_attr['cluster_name']}",
                             f"cluster_name: {cluster_name}")
@@ -119,7 +118,6 @@ class Corosync():
         cmd = 'corosync-cfgtool -s'
         data = utils.exec_cmd(cmd,self.conn)
         ring_data = re.findall('RING ID\s\d*[\s\S]*?id\s*=\s*(.*)',data)
-
         if len(ring_data) == 2:
             if node['public_ip'] in ring_data and node['private_ip']['ip'] in ring_data:
                 return True
@@ -388,10 +386,13 @@ class RA():
 
 
     def _get_ra_path(self):
-        list_path_now = sys.path[0].split('/')
-        list_path_now.pop(-1)
-        list_path_now.append('RA')
-        ra_path = '/'.join(list_path_now)
+        # list_path_now = sys.path[0].split('/')
+        # list_path_now.pop(-1)
+        # list_path_now.append('RA')
+        # ra_path = '/'.join(list_path_now)
+
+        ra_path = '../RA'
+
         return ra_path
 
 
