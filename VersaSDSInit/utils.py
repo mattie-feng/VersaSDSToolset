@@ -6,8 +6,6 @@ import subprocess
 import time
 import json
 import prettytable
-from threading import Thread
-from functools import wraps
 
 class SSHConn(object):
 
@@ -255,27 +253,3 @@ def exec_cmd(cmd,conn=None):
     return result
 
 
-
-
-class RunPrompt():
-    flag = True
-
-    def run(self,func,*args,**kwargs):
-        thr = Thread(target=func, args=args, kwargs=kwargs)
-        thr.start()
-        while RunPrompt.flag:
-            time.sleep(1)
-            print('.',end='',flush=True)
-        print('\n',end='')
-        RunPrompt.flag = True
-
-    @staticmethod
-    def terminate():
-        RunPrompt.flag = False
-
-
-def deco_prompt(func):
-    @wraps(func)
-    def wrapper(self):
-        RunPrompt().run(func,self)
-    return wrapper

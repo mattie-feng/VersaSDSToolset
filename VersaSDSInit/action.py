@@ -1,8 +1,6 @@
 import time
-import sys
 import utils
 import re
-from threading import Thread
 
 corosync_conf_path = '/etc/corosync/corosync.conf'
 read_data = './corosync.conf'
@@ -120,10 +118,8 @@ class Corosync():
         cmd = 'corosync-cfgtool -s'
         data = utils.exec_cmd(cmd,self.conn)
         ring_data = re.findall('RING ID\s\d*[\s\S]*?id\s*=\s*(.*)',data)
-        print(ring_data)
         if len(ring_data) == 2:
             if node['public_ip'] in ring_data and node['private_ip']['ip'] in ring_data:
-                print(1)
                 return True
 
 
