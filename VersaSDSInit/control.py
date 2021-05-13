@@ -128,7 +128,6 @@ class Scheduler():
 
 
     def check_corosync(self):
-        time.sleep(5)
         nodes = [node['hostname'] for node in self.cluster['node']]
         lst_ring_status = []
         lst_cluster_status = []

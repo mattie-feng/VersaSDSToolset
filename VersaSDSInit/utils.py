@@ -140,7 +140,7 @@ class FileEdit():
 
 class ConfFile():
     def __init__(self):
-        self.yaml_file = 'ClusterConf.yaml'
+        self.yaml_file = './ClusterConf.yaml'
         self.cluster = self.read_yaml()
 
     def read_yaml(self):

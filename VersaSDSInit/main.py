@@ -31,9 +31,15 @@ class VersaSDSInit():
         )
 
         # 可增加独项的
-        parser_run.add_argument(
-            '--corosync',
-            help='Only do corosync work')
+        # subp_run = parser_run.add_subparsers()
+        # subp_run.add_parser(dest='hostname')
+        # subp.
+
+
+
+        # parser_run.add_argument(
+        #     '--corosync',
+        #     help='Only do corosync work')
 
 
         parser_run.set_defaults(func=self.run)
@@ -57,7 +63,7 @@ class VersaSDSInit():
 
         controller.get_ssh_conn()
         print('start to set private ip')
-        control.set_ip_on_device()
+        controller.set_ip_on_device()
         print('start to modify hostname')
         controller.modify_hostname()
         print('start to build ssh connect')
@@ -150,4 +156,6 @@ if __name__  == '__main__':
     # sc.get_ssh_conn()
     # sc.modify_hostname()
     # sc.ssh_conn_build()
+    # sc.check_corosync()
+    # sc.packmaker_conf_change()
     main()
