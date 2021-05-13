@@ -4,6 +4,7 @@ import os
 
 import control
 import utils
+import consts
 
 
 
@@ -54,7 +55,15 @@ class VersaSDSInit():
 
 
         parser_show.set_defaults(func=self.show)
-        self.parser.set_defaults(func=self.print_help)
+        # self.parser.set_defaults(func=self.print_help)
+
+        self.parser.set_defaults(func=self.func_vtel)
+
+    def func_vtel(self, args):
+        if args.version:
+            print(f'Pacemaker Init: {consts.VERSION}')
+        else:
+            self.parser.print_help()
 
 
     def run(self,args):
