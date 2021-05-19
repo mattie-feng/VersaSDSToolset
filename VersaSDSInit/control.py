@@ -1,5 +1,6 @@
 import gevent
 from gevent import monkey
+import time
 
 from ssh_authorized import SSHAuthorizeNoMGN
 import utils
@@ -10,6 +11,7 @@ monkey.patch_all()
 
 
 timeout = gevent.Timeout(60)
+
 
 
 
@@ -276,3 +278,48 @@ class Scheduler():
             ip_service = action.IpService(ssh)
             lst_up.append(gevent.spawn(ip_service.up_ip_service, node['private_ip']['device']))
         gevent.joinall(lst_up)
+
+
+    # HA controller配置
+    def build_ha_controller(self):
+        back_path = '/home/samba/backup'
+        ha = action.HALinstorController()
+        ha.create_rd('linstordb')
+        ha.create_vd('linstordb', '250M')
+
+        lst_res_create = []
+        for node in self.cluster['node']:
+            lst_res_create.append(gevent.spawn(ha.create_res,'linstordb',node['hostname'],'pool0'))
+
+        gevent.joinall(lst_res_create)
+
+        for ssh in self.list_ssh:
+            ha = action.HALinstorController(ssh)
+            if ha.is_active_controller():
+                ha.stop_controller()
+                ha.backup_linstor(back_path) # 要放置备份文件的路径（文件夹）
+                ha.move_database(back_path)
+                ha.add_linstordb_to_pacemaker(2)
+
+
+    def backup_linstordb(self):
+        linstordb_path = 'ls -l /var/lib/linstor'
+        linstordb_backup_path = f'/backup_linstor_{time.strftime("%m%d")}'
+
+        for ssh in self.list_ssh:
+            ha = action.HALinstorController(ssh)
+            if ha.is_active_controller():
+                if ha.check_linstor_file(linstordb_path):
+                    ha.backup_linstor(linstordb_backup_path)
+
+
+
+
+
+
+
+
+
+
+
+

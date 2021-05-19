@@ -152,10 +152,9 @@ def main():
 
 
 if __name__  == '__main__':
-    # sc = control.Scheduler()
-    # sc.get_ssh_conn()
-    # sc.modify_hostname()
-    # sc.ssh_conn_build()
-    # sc.check_corosync()
-    # sc.packmaker_conf_change()
-    main()
+    sc = control.Scheduler()
+    sc.get_ssh_conn()
+    sc.backup_linstordb()
+
+    # main()
+
