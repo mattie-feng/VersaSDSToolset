@@ -30,6 +30,12 @@ class VersaSDSInit():
             help='starting program',
         )
 
+        parser_ha = subp.add_parser(
+            'ha',
+            help='config HA controller'
+        )
+
+
         # 可增加独项的
         # subp_run = parser_run.add_subparsers()
         # subp_run.add_parser(dest='hostname')
@@ -43,6 +49,7 @@ class VersaSDSInit():
 
 
         parser_run.set_defaults(func=self.run)
+        parser_ha.set_defaults(func=self.ha)
 
 
 
@@ -106,6 +113,32 @@ class VersaSDSInit():
 
         print('*success*')
 
+
+    def ha(self, args):
+        controller = control.Scheduler()
+        controller.get_ssh_conn()
+
+        print('*start*')
+        print('Start configuration HA controller')
+        controller.build_ha_controller()
+        print('Finish configuration，checking')
+        if controller.check_ha_controller():
+            print('Success')
+        else:
+            print('Fail，exit')
+            sys.exit()
+
+        print('Start the backup of linstordb ')
+        if controller.backup_linstordb():
+            print('Success')
+        else:
+            print('Fail，exit')
+            sys.exit()
+
+        print('*success*')
+
+
+
     def show(self,args):
         controller = control.Scheduler()
         controller.get_ssh_conn()
@@ -152,9 +185,10 @@ def main():
 
 
 if __name__  == '__main__':
-    sc = control.Scheduler()
-    sc.get_ssh_conn()
-    sc.backup_linstordb()
+    # sc = control.Scheduler()
+    # sc.get_ssh_conn()
+    # sc.build_ha_controller()
+    # sc.backup_linstordb()
 
-    # main()
+    main()
 

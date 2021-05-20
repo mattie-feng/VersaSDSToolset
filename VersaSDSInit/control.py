@@ -1,6 +1,7 @@
 import gevent
 from gevent import monkey
 import time
+import sys
 
 from ssh_authorized import SSHAuthorizeNoMGN
 import utils
@@ -35,6 +36,7 @@ class Scheduler():
                 self.list_ssh.append(ssh.make_connect(node['public_ip'],node['port'],'root',node['root_password']))
 
         return self.list_ssh
+
 
     def modify_hostname(self):
         lst = []
@@ -287,6 +289,15 @@ class Scheduler():
         ha.create_rd('linstordb')
         ha.create_vd('linstordb', '250M')
 
+        if not ha.linstor_is_conn():
+            print('LINSTOR connection refused')
+            sys.exit()
+
+        node_list = [node['hostname'] for node in self.cluster['node']]
+        if not ha.pool0_is_exist(node_list):
+            print('storage-pool：pool0 does not exist')
+            sys.exit()
+
         lst_res_create = []
         for node in self.cluster['node']:
             lst_res_create.append(gevent.spawn(ha.create_res,'linstordb',node['hostname'],'pool0'))
@@ -302,15 +313,38 @@ class Scheduler():
                 ha.add_linstordb_to_pacemaker(2)
 
 
-    def backup_linstordb(self):
+    def check_ha_controller(self,timeout=30):
+        ha = action.HALinstorController()
+        node_list = [node['hostname'] for node in self.cluster['node']]
+        t_beginning = time.time()
+        while True:
+            if ha.check_linstor_controller(node_list):
+                return True
+            seconds_passed = time.time() - t_beginning
+            if timeout and seconds_passed > timeout:
+                return False
+            time.sleep(1)
+
+    def backup_linstordb(self,timeout=30):
         linstordb_path = 'ls -l /var/lib/linstor'
         linstordb_backup_path = f'/backup_linstor_{time.strftime("%m%d")}'
+        t_beginning = time.time()
+        while True:
+            for ssh in self.list_ssh:
+                ha = action.HALinstorController(ssh)
+                if ha.is_active_controller():
+                    if ha.check_linstor_file(linstordb_path):
+                        ha.backup_linstor(linstordb_backup_path)
 
-        for ssh in self.list_ssh:
-            ha = action.HALinstorController(ssh)
-            if ha.is_active_controller():
-                if ha.check_linstor_file(linstordb_path):
-                    ha.backup_linstor(linstordb_backup_path)
+                if ha.check_linstor_file(f'{linstordb_backup_path}/linstor'):
+                    return True
+            seconds_passed = time.time() - t_beginning
+            if timeout and seconds_passed > timeout:
+                return False
+            time.sleep(1)
+
+
+
 
 
 

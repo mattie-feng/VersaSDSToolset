@@ -425,6 +425,20 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         self.conn = conn
 
 
+    def linstor_is_conn(self):
+        cmd_result = utils.exec_cmd('linstor n l',self.conn)
+        if not 'Connection refused' in cmd_result:
+            return True
+
+    def pool0_is_exist(self,list_node):
+        cmd = 'linstor sp l -s pool0 | cat'
+        pool0_table = utils.exec_cmd(cmd,self.conn)
+        for node in list_node:
+            if not node in pool0_table:
+                return False
+        return True
+
+
 
     def create_rd(self,name):
         cmd = f"linstor resource-definition create {name}"
@@ -438,9 +452,8 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
 
     def create_res(self,name,node,sp):
         cmd = f"linstor resource create {node} {name} --storage-pool {sp}"
-        utils.exec_cmd(cmd,self.conn)
+        result = utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
-
 
     def stop_controller(self):
         cmd = f"systemctl stop linstor-controller"
@@ -453,11 +466,17 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         E.g: backup_path = 'home/samba' 文件夹
         """
         cmd = f"rsync -avp /var/lib/linstor {backup_path}/"
-        print(cmd)
         if not bool(utils.exec_cmd(f'[ -d {backup_path} ] && echo True', self.conn)):
             utils.exec_cmd(f"mkdir -p {backup_path}")
         utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
+
+
+    def get_controller(self):
+        data = utils.exec_cmd("crm st | cat",self.conn)
+        controller = re.findall("Masters: \[\s(\w*)\s\]",data)
+        if controller:
+            return controller[0]
 
 
     def is_active_controller(self):
