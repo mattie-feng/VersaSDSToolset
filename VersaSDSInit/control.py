@@ -345,7 +345,19 @@ class Scheduler():
 
 
 
+    def destroy_linstordb(self):
+        for ssh in self.list_ssh:
+            ha = action.HALinstorController(ssh)
+            list_lv = ha.get_linstordb_lv()
+            ha.umount_lv(list_lv)
+            ha.secondary_drbd('linstordb')
+            ha.delete_rd('linstordb') # 一般只需在一个节点上执行一次
+            ha.remove_lv(list_lv)
 
+
+
+
+        
 
 
 

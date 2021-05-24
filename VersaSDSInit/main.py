@@ -36,6 +36,7 @@ class VersaSDSInit():
         )
 
 
+
         # 可增加独项的
         # subp_run = parser_run.add_subparsers()
         # subp_run.add_parser(dest='hostname')
@@ -126,6 +127,9 @@ class VersaSDSInit():
             print('Success')
         else:
             print('Fail，exit')
+            print('Start to clear linstordb')
+            controller.destroy_linstordb()
+            print('Clear end')
             sys.exit()
 
         print('Start the backup of linstordb ')
@@ -187,8 +191,8 @@ def main():
 if __name__  == '__main__':
     # sc = control.Scheduler()
     # sc.get_ssh_conn()
-    # sc.build_ha_controller()
-    # sc.backup_linstordb()
-
+    # # sc.build_ha_controller()
+    # # sc.backup_linstordb()
+    # sc.destroy_linstordb()
     main()
 

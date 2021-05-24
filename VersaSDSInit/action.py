@@ -452,7 +452,12 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
 
     def create_res(self,name,node,sp):
         cmd = f"linstor resource create {node} {name} --storage-pool {sp}"
-        result = utils.exec_cmd(cmd,self.conn)
+        utils.exec_cmd(cmd,self.conn)
+        time.sleep(0)
+
+    def delete_rd(self,name):
+        cmd = f"linstor rd d {name}"
+        utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
 
     def stop_controller(self):
@@ -535,7 +540,6 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         return True
 
 
-
     def check_linstor_file(self,path):
         data = utils.exec_cmd(f'ls -l {path}')
         if 'linstordb.mv.db' in data and \
@@ -544,4 +548,40 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
 
             return True
 
+    def get_linstordb_lv(self):
+        cmd = 'lvs /dev/*/linstordb* -o lv_name,vg_name --noheadings'
+        lv_data = utils.exec_cmd(cmd,self.conn)
+        list_lv = []
+        if not 'invalid characters' in lv_data:
+            lv_all = re.findall('\s*(\w*)\s(\w*)',lv_data)
+            if lv_all:
+                list_lv = [f"/dev/{lv[1]}/{lv[0]}" for lv in lv_all]
+        return list_lv
+
+    def remove_lv(self,list_lv):
+        """
+        删除指定的lv，最后返回删除失败（已挂载）的lv列表
+        :param lv_dict: E.g {'lv01':'vg01','lv02':'vg01'}
+        :return:
+        """
+
+        fail_list = []
+        for lv in list_lv:
+            cmd = f"lvremove {lv} -y"
+            cmd_result = utils.exec_cmd(cmd,self.conn)
+            if 'in use' in cmd_result:
+                fail_list.append(lv)
+
+        return fail_list # 返回已挂载而导致无法删除的lv
+
+
+    def umount_lv(self,list_lv):
+        for lv in list_lv:
+            cmd = f'umount {lv}'
+            utils.exec_cmd(cmd,self.conn)
+
+
+    def secondary_drbd(self,drbd):
+        cmd = f'drbdadm secondary {drbd}'
+        utils.exec_cmd(cmd,self.conn)
 
