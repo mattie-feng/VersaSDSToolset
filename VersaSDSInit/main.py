@@ -4,6 +4,7 @@ import os
 
 import control
 import utils
+import consts
 
 
 
@@ -11,7 +12,6 @@ class VersaSDSTools():
     def __init__(self):
         self.parser = argparse.ArgumentParser(prog='main')
         self.setup_parser()
-
 
 
     def setup_parser(self):
@@ -51,8 +51,16 @@ class VersaSDSTools():
         parser_ls_bk.set_defaults(func=self.backup_linstor)
         parser_ls_del.set_defaults(func=self.delete_linstordb)
 
+        self.parser.set_defaults(func=self.main_usage)
 
-        self.parser.set_defaults(func=self.print_help)
+        
+        
+
+    def main_usage(self, args):
+        if args.version:
+            print(f'Pacemaker Init: {consts.VERSION}')
+        else:
+            self.print_help()
 
 
     def init_pacemaker_cluster(self, args):
