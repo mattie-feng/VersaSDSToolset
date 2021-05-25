@@ -6,6 +6,9 @@ import subprocess
 import time
 import json
 import prettytable
+import pexpect
+import re
+import sys
 
 class SSHConn(object):
 
@@ -253,3 +256,44 @@ def exec_cmd(cmd,conn=None):
     return result
 
 
+
+# def exec_cmd_second(cmd, timeout=10):
+#     """
+#     Execute the command cmd to return the content of the command output.
+#     If it times out, a TimeoutError exception will be thrown.
+#     cmd - Command to be executed
+#     timeout - The longest waiting time(unit:second)
+#     """
+#     p = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE, stdin=subprocess.PIPE, shell=True)
+#     t_beginning = time.time()
+#     seconds_passed = 0
+#     output = None
+#
+#     while True:
+#         if p.poll() is not None:
+#             break
+#         if p.stderr:
+#             p.stderr
+#             break
+#
+#
+#         seconds_passed = time.time() - t_beginning
+#         if timeout and seconds_passed > timeout:
+#             p.terminate()
+#             raise TimeoutError(cmd, timeout)
+#         time.sleep(0.1)
+#     out, err = p.communicate()
+#     if len(out) > 0:
+#         out = out.decode()
+#         output = {'sts': 1, 'rst': out}
+#     elif len(err) > 0:
+#         err = err.decode()
+#         output = {'sts': 0, 'rst': err}
+#     elif out == b'':  # 需要再考虑一下 res stop 执行成功没有返回，stop失败也没有返回（无法判断stop成不成功）
+#         out = out.decode()
+#         output = {'sts': 1, 'rst': out}
+#
+#     if output:
+#         return output
+#     else:
+#         s.handle_exception()

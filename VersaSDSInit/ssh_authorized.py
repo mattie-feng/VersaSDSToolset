@@ -502,6 +502,11 @@ class SSHAuthorizeNoMGN(SSHAuthorize):
         self.distribute_all_hosts_by_connect_via_user(cluster_name,list_ssh)
 
 
+    def get_ssh(self,hostname):
+        pass
+
+
+
 
 if __name__ == '__main__':
     node_infos = [['10.203.1.155', 22, 'root', 'password'], ['10.203.1.157', 22, 'root', 'password'],['10.203.1.195', 22, 'root', 'password']]

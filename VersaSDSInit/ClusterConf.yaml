@@ -1,4 +1,4 @@
-cluster: cluster
+cluster: cluster_210519
 node:
 - hostname: vince2
   port: 22
@@ -8,11 +8,11 @@ node:
     ip: 10.203.2.186
   public_ip: 10.203.1.157
   root_password: password
-- hostname: vince4
+- hostname: vince1
   port: 22
   private_ip:
     device: ens192
     gateway: 10.203.2.1
-    ip: 10.203.2.185
-  public_ip: 10.203.1.159
+    ip: 10.203.2.187
+  public_ip: 10.203.1.155
   root_password: password
