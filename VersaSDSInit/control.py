@@ -283,8 +283,7 @@ class Scheduler():
 
 
     # HA controller配置
-    def build_ha_controller(self):
-        back_path = '/home/samba/backup'
+    def build_ha_controller(self,back_path='/tmp/'):
         ha = action.HALinstorController()
         ha.create_rd('linstordb')
         ha.create_vd('linstordb', '250M')
@@ -325,18 +324,17 @@ class Scheduler():
                 return False
             time.sleep(1)
 
-    def backup_linstordb(self,timeout=30):
+    def backup_linstordb(self,path,timeout=30):
         linstordb_path = 'ls -l /var/lib/linstor'
-        linstordb_backup_path = f'/backup_linstor_{time.strftime("%m%d")}'
         t_beginning = time.time()
         while True:
             for ssh in self.list_ssh:
                 ha = action.HALinstorController(ssh)
                 if ha.is_active_controller():
                     if ha.check_linstor_file(linstordb_path):
-                        ha.backup_linstor(linstordb_backup_path)
+                        ha.backup_linstor(path)
 
-                if ha.check_linstor_file(f'{linstordb_backup_path}/linstor'):
+                if ha.check_linstor_file(f'{path}/linstor'):
                     return True
             seconds_passed = time.time() - t_beginning
             if timeout and seconds_passed > timeout:
@@ -346,6 +344,11 @@ class Scheduler():
 
 
     def destroy_linstordb(self):
+        ha = action.HALinstorController()
+        if not ha.linstor_is_conn():
+            print('LINSTOR connection refused')
+            sys.exit()
+
         for ssh in self.list_ssh:
             ha = action.HALinstorController(ssh)
             list_lv = ha.get_linstordb_lv()
@@ -353,6 +356,9 @@ class Scheduler():
             ha.secondary_drbd('linstordb')
             ha.delete_rd('linstordb') # 一般只需在一个节点上执行一次
             ha.remove_lv(list_lv)
+
+
+
 
 
 

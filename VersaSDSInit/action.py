@@ -470,7 +470,9 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         """
         E.g: backup_path = 'home/samba' 文件夹
         """
-        cmd = f"rsync -avp /var/lib/linstor {backup_path}/"
+        if not backup_path.endswith('/'):
+            backup_path += '/'
+        cmd = f"rsync -avp /var/lib/linstor {backup_path}"
         if not bool(utils.exec_cmd(f'[ -d {backup_path} ] && echo True', self.conn)):
             utils.exec_cmd(f"mkdir -p {backup_path}")
         utils.exec_cmd(cmd,self.conn)
@@ -552,7 +554,7 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         cmd = 'lvs /dev/*/linstordb* -o lv_name,vg_name --noheadings'
         lv_data = utils.exec_cmd(cmd,self.conn)
         list_lv = []
-        if not 'invalid characters' in lv_data:
+        if lv_data and not 'invalid characters' in lv_data:
             lv_all = re.findall('\s*(\w*)\s(\w*)',lv_data)
             if lv_all:
                 list_lv = [f"/dev/{lv[1]}/{lv[0]}" for lv in lv_all]
