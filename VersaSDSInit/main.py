@@ -4,6 +4,7 @@ import os
 
 import control
 import utils
+import consts
 
 
 
@@ -18,42 +19,46 @@ class VersaSDSTools():
         subp = self.parser.add_subparsers(metavar='',dest='subargs_vtel')
 
 
+        # cmd:parser
         parser_pc = subp.add_parser(
             'pacemaker',
             aliases=['pc'],
             help='Pacemaker cluster operation'
         )
 
+        # Build command: pacemaker
         subp_pc = parser_pc.add_subparsers()
         parser_pc_init = subp_pc.add_parser('init',help='Initialize pacemaker cluster')
 
         parser_pc_controller = subp_pc.add_parser('controller',aliases=['con'],help='Configure HA linstor-controller')
-        parser_pc_controller.add_argument('-p','--path',dest='path',help='Specify a backup path')
-
         parser_pc_show = subp_pc.add_parser('show',help='View pacemaker cluster status')
 
-
+        # Binding function
         parser_pc_init.set_defaults(func=self.init_pacemaker_cluster)
         parser_pc_controller.set_defaults(func=self.conf_controller)
         parser_pc_show.set_defaults(func=self.show_pacemaker_cluster)
 
-
+        # Build command: linstor
         parser_ls = subp.add_parser(
             'linstor',
             aliases=['ls'],
             help='Linstor cluster operation'
         )
 
+
         subp_ls = parser_ls.add_subparsers()
         parser_ls_bk = subp_ls.add_parser('backup',aliases=['bk'],help='Backup linstor cluster')
-        parser_ls_bk.add_argument('-p','--path',dest='path',help='Specify a backup path',required=True)
         parser_ls_del = subp_ls.add_parser('del',aliases=['d'],help='Clear linstordb')
+
+        # Binding function
         parser_ls_bk.set_defaults(func=self.backup_linstor)
         parser_ls_del.set_defaults(func=self.delete_linstordb)
 
-
         self.parser.set_defaults(func=self.print_help)
 
+
+    def print_help(self, args):
+        self.parser.print_help()
 
     def init_pacemaker_cluster(self, args):
         controller = control.Scheduler()
@@ -129,10 +134,7 @@ class VersaSDSTools():
         controller = control.Scheduler()
         controller.get_ssh_conn()
         print('*start*')
-        if args.path:
-            controller.build_ha_controller(back_path=args.path)
-        else:
-            controller.build_ha_controller()
+        controller.build_ha_controller()
         print('Finish configuration，checking')
         if not controller.check_ha_controller():
             print('Fail，exit')
@@ -143,15 +145,22 @@ class VersaSDSTools():
         controller = control.Scheduler()
         controller.get_ssh_conn()
         print('*start*')
-        if controller.backup_linstordb(args.path):
+        if controller.backup_linstordb():
             print('Success')
         else:
             print('Fail，exit')
             sys.exit()
         print('*success*')
 
-    def print_help(self, *args):
-        self.parser.print_help()
+
+    def main_usage(self, args):
+        if args.version:
+            print(f'Pacemaker Init: {consts.VERSION}')
+        else:
+            self.print_help(self.parser)
+
+
+
 
     def parse(self):  # 调用入口
         args = self.parser.parse_args()

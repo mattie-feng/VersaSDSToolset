@@ -494,6 +494,9 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
 
 
     def move_database(self,backup_path):
+        if backup_path.endswith('/'):
+            backup_path = backup_path[:-1]
+
         cmd_mkfs = "mkfs.ext4 /dev/drbd/by-res/linstordb/0"
         cmd_rm = "rm -rf /var/lib/linstor/*"
         cmd_mount = "mount /dev/drbd/by-res/linstordb/0 /var/lib/linstor"

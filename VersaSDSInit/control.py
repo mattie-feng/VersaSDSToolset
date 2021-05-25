@@ -283,7 +283,8 @@ class Scheduler():
 
 
     # HA controller配置
-    def build_ha_controller(self,back_path='/tmp/'):
+    def build_ha_controller(self):
+        backup_path = self.cluster['backup_path']
         ha = action.HALinstorController()
         ha.create_rd('linstordb')
         ha.create_vd('linstordb', '250M')
@@ -307,8 +308,8 @@ class Scheduler():
             ha = action.HALinstorController(ssh)
             if ha.is_active_controller():
                 ha.stop_controller()
-                ha.backup_linstor(back_path) # 要放置备份文件的路径（文件夹）
-                ha.move_database(back_path)
+                ha.backup_linstor(backup_path) # 要放置备份文件的路径（文件夹）
+                ha.move_database(backup_path)
                 ha.add_linstordb_to_pacemaker(2)
 
 
@@ -324,17 +325,21 @@ class Scheduler():
                 return False
             time.sleep(1)
 
-    def backup_linstordb(self,path,timeout=30):
+    def backup_linstordb(self,timeout=30):
         linstordb_path = 'ls -l /var/lib/linstor'
+        if self.cluster['backup_path'].endswith('/'):
+            backup_path = f"{self.cluster['backup_path']}backup_{time.strftime('%Y%m%d%H%M')}"
+        else:
+            backup_path = f"{self.cluster['backup_path']}/backup_{time.strftime('%Y%m%d%H%M')}"
+
         t_beginning = time.time()
         while True:
             for ssh in self.list_ssh:
                 ha = action.HALinstorController(ssh)
                 if ha.is_active_controller():
                     if ha.check_linstor_file(linstordb_path):
-                        ha.backup_linstor(path)
-
-                if ha.check_linstor_file(f'{path}/linstor'):
+                        ha.backup_linstor(backup_path)
+                if ha.check_linstor_file(f'{backup_path}/linstor'):
                     return True
             seconds_passed = time.time() - t_beginning
             if timeout and seconds_passed > timeout:
