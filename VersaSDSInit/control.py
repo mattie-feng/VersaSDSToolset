@@ -1,5 +1,7 @@
 import gevent
 from gevent import monkey
+import time
+import sys
 
 from ssh_authorized import SSHAuthorizeNoMGN
 import utils
@@ -10,6 +12,7 @@ monkey.patch_all()
 
 
 timeout = gevent.Timeout(60)
+
 
 
 
@@ -33,6 +36,7 @@ class Scheduler():
                 self.list_ssh.append(ssh.make_connect(node['public_ip'],node['port'],'root',node['root_password']))
 
         return self.list_ssh
+
 
     def modify_hostname(self):
         lst = []
@@ -276,3 +280,103 @@ class Scheduler():
             ip_service = action.IpService(ssh)
             lst_up.append(gevent.spawn(ip_service.up_ip_service, node['private_ip']['device']))
         gevent.joinall(lst_up)
+
+
+    # HA controller配置
+    def build_ha_controller(self):
+        backup_path = self.cluster['backup_path']
+        ha = action.HALinstorController()
+        ha.create_rd('linstordb')
+        ha.create_vd('linstordb', '250M')
+
+        if not ha.linstor_is_conn():
+            print('LINSTOR connection refused')
+            sys.exit()
+
+        node_list = [node['hostname'] for node in self.cluster['node']]
+        if not ha.pool0_is_exist(node_list):
+            print('storage-pool：pool0 does not exist')
+            sys.exit()
+
+        lst_res_create = []
+        for node in self.cluster['node']:
+            lst_res_create.append(gevent.spawn(ha.create_res,'linstordb',node['hostname'],'pool0'))
+
+        gevent.joinall(lst_res_create)
+
+        for ssh in self.list_ssh:
+            ha = action.HALinstorController(ssh)
+            if ha.is_active_controller():
+                ha.stop_controller()
+                ha.backup_linstor(backup_path) # 要放置备份文件的路径（文件夹）
+                ha.move_database(backup_path)
+                ha.add_linstordb_to_pacemaker(2)
+
+
+    def check_ha_controller(self,timeout=30):
+        ha = action.HALinstorController()
+        node_list = [node['hostname'] for node in self.cluster['node']]
+        t_beginning = time.time()
+        while True:
+            if ha.check_linstor_controller(node_list):
+                return True
+            seconds_passed = time.time() - t_beginning
+            if timeout and seconds_passed > timeout:
+                return False
+            time.sleep(1)
+
+    def backup_linstordb(self,timeout=30):
+        linstordb_path = 'ls -l /var/lib/linstor'
+        if self.cluster['backup_path'].endswith('/'):
+            backup_path = f"{self.cluster['backup_path']}backup_{time.strftime('%Y%m%d%H%M')}"
+        else:
+            backup_path = f"{self.cluster['backup_path']}/backup_{time.strftime('%Y%m%d%H%M')}"
+
+        t_beginning = time.time()
+        while True:
+            for ssh in self.list_ssh:
+                ha = action.HALinstorController(ssh)
+                if ha.is_active_controller():
+                    if ha.check_linstor_file(linstordb_path):
+                        ha.backup_linstor(backup_path)
+                if ha.check_linstor_file(f'{backup_path}/linstor'):
+                    return True
+            seconds_passed = time.time() - t_beginning
+            if timeout and seconds_passed > timeout:
+                return False
+            time.sleep(1)
+
+
+
+    def destroy_linstordb(self):
+        ha = action.HALinstorController()
+        if not ha.linstor_is_conn():
+            print('LINSTOR connection refused')
+            sys.exit()
+
+        for ssh in self.list_ssh:
+            ha = action.HALinstorController(ssh)
+            list_lv = ha.get_linstordb_lv()
+            ha.umount_lv(list_lv)
+            ha.secondary_drbd('linstordb')
+            ha.delete_rd('linstordb') # 一般只需在一个节点上执行一次
+            ha.remove_lv(list_lv)
+
+
+
+
+
+
+
+        
+
+
+
+
+
+
+
+
+
+
+

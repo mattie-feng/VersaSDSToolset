@@ -4,6 +4,7 @@ import re
 
 corosync_conf_path = '/etc/corosync/corosync.conf'
 read_data = './corosync.conf'
+crm_lincontrl_config = './crm_lincontrl_config'
 
 
 class IpService(object):
@@ -396,4 +397,196 @@ class RA():
         return ra_path
 
 
+
+class HALinstorController():
+    stencil = """primitive p_drbd_linstordb ocf:linbit:drbd \
+        params drbd_resource=linstordb \
+        op monitor interval=29 role=Master \
+        op monitor interval=30 role=Slave \
+        op start interval=0 timeout=240s \
+        op stop interval=0 timeout=100s
+primitive p_fs_linstordb Filesystem \
+        params device="/dev/drbd/by-res/linstordb/0" directory="/var/lib/linstor" fstype=ext4 \
+        op start interval=0 timeout=60s \
+        op stop interval=0 timeout=100s \
+        op monitor interval=20s timeout=40s
+primitive p_linstor-controller systemd:linstor-controller \
+        op start interval=0 timeout=100s \
+        op stop interval=0 timeout=100s \
+        op monitor interval=30s timeout=100s
+group g_linstor p_fs_linstordb p_linstor-controller
+ms ms_drbd_linstordb p_drbd_linstordb \
+        meta master-max=1 master-node-max=1 clone-max=3 clone-node-max=1 notify=true
+colocation c_linstor_with_drbd inf: g_linstor ms_drbd_linstordb:Master
+order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
+
+
+    def __init__(self,conn=None):
+        self.conn = conn
+
+
+    def linstor_is_conn(self):
+        cmd_result = utils.exec_cmd('linstor n l',self.conn)
+        if not 'Connection refused' in cmd_result:
+            return True
+
+    def pool0_is_exist(self,list_node):
+        cmd = 'linstor sp l -s pool0 | cat'
+        pool0_table = utils.exec_cmd(cmd,self.conn)
+        for node in list_node:
+            if not node in pool0_table:
+                return False
+        return True
+
+
+
+    def create_rd(self,name):
+        cmd = f"linstor resource-definition create {name}"
+        utils.exec_cmd(cmd,self.conn)
+        time.sleep(0)
+
+    def create_vd(self,name,size):
+        cmd = f"linstor volume-definition create {name} {size}"
+        utils.exec_cmd(cmd,self.conn)
+        time.sleep(0)
+
+    def create_res(self,name,node,sp):
+        cmd = f"linstor resource create {node} {name} --storage-pool {sp}"
+        utils.exec_cmd(cmd,self.conn)
+        time.sleep(0)
+
+    def delete_rd(self,name):
+        cmd = f"linstor rd d {name}"
+        utils.exec_cmd(cmd,self.conn)
+        time.sleep(0)
+
+    def stop_controller(self):
+        cmd = f"systemctl stop linstor-controller"
+        utils.exec_cmd(cmd,self.conn)
+        time.sleep(0)
+
+
+    def backup_linstor(self,backup_path):
+        """
+        E.g: backup_path = 'home/samba' 文件夹
+        """
+        if not backup_path.endswith('/'):
+            backup_path += '/'
+        cmd = f"rsync -avp /var/lib/linstor {backup_path}"
+        if not bool(utils.exec_cmd(f'[ -d {backup_path} ] && echo True', self.conn)):
+            utils.exec_cmd(f"mkdir -p {backup_path}")
+        utils.exec_cmd(cmd,self.conn)
+        time.sleep(0)
+
+
+    def get_controller(self):
+        data = utils.exec_cmd("crm st | cat",self.conn)
+        controller = re.findall("Masters: \[\s(\w*)\s\]",data)
+        if controller:
+            return controller[0]
+
+
+    def is_active_controller(self):
+        cmd_result = utils.exec_cmd("systemctl status linstor-controller | cat",self.conn)
+        status = re.findall('Active:\s(\w*)\s', cmd_result)
+        if status and status[0] == 'active':
+            return True
+
+
+    def move_database(self,backup_path):
+        if backup_path.endswith('/'):
+            backup_path = backup_path[:-1]
+
+        cmd_mkfs = "mkfs.ext4 /dev/drbd/by-res/linstordb/0"
+        cmd_rm = "rm -rf /var/lib/linstor/*"
+        cmd_mount = "mount /dev/drbd/by-res/linstordb/0 /var/lib/linstor"
+        cmd_rsync = f"rsync -avp {backup_path}/linstor/ /var/lib/linstor/"
+
+        utils.exec_cmd(cmd_mkfs,self.conn)
+        utils.exec_cmd(cmd_rm,self.conn)
+        utils.exec_cmd(cmd_mount,self.conn)
+        utils.exec_cmd(cmd_rsync,self.conn)
+        time.sleep(0)
+
+
+    def add_linstordb_to_pacemaker(self,clone_max):
+        self.stencil = self.stencil.replace(f'clone-max=3',f'clone-max={clone_max}')
+        with open('crm_lincontrl_config','w') as f:
+            f.write(self.stencil)
+        cmd  = "crm config load update crm_lincontrl_config"
+        utils.exec_cmd(cmd,self.conn)
+        # 这里可以设置删除这个文件，但好像没有必要
+
+
+
+    def check_linstor_controller(self,list_node):
+        data = utils.exec_cmd('crm st | cat',self.conn)
+        p_fs_linstordb = re.findall('p_fs_linstordb\s*\(ocf::heartbeat:Filesystem\):\s*(.*)',data)
+        p_linstor_controller = re.findall('p_linstor-controller\s*\(systemd:linstor-controller\):\s*(.*)',data)
+        masters = re.findall('Masters:\s\[\s(\w*)\s\]', data)
+        slaves = re.findall('Slaves:\s\[\s(.*)\s\]', data)
+
+
+        if not p_fs_linstordb or 'Started' not in p_fs_linstordb[0]:
+            return
+        if not p_linstor_controller or 'Started' not in p_linstor_controller[0]:
+            return
+        if not masters and len(masters) != 1:
+            return
+        if not slaves:
+            return
+
+        slaves = slaves[0].split(' ')
+        all_node = []
+        all_node.extend(masters)
+        all_node.extend(slaves)
+        if set(all_node) != set(list_node):
+            return
+        return True
+
+
+    def check_linstor_file(self,path):
+        data = utils.exec_cmd(f'ls -l {path}')
+        if 'linstordb.mv.db' in data and \
+            'linstordb.trace.db' in data and \
+            'loop_device_mapping' in data:
+
+            return True
+
+    def get_linstordb_lv(self):
+        cmd = 'lvs /dev/*/linstordb* -o lv_name,vg_name --noheadings'
+        lv_data = utils.exec_cmd(cmd,self.conn)
+        list_lv = []
+        if lv_data and not 'invalid characters' in lv_data:
+            lv_all = re.findall('\s*(\w*)\s(\w*)',lv_data)
+            if lv_all:
+                list_lv = [f"/dev/{lv[1]}/{lv[0]}" for lv in lv_all]
+        return list_lv
+
+    def remove_lv(self,list_lv):
+        """
+        删除指定的lv，最后返回删除失败（已挂载）的lv列表
+        :param lv_dict: E.g {'lv01':'vg01','lv02':'vg01'}
+        :return:
+        """
+
+        fail_list = []
+        for lv in list_lv:
+            cmd = f"lvremove {lv} -y"
+            cmd_result = utils.exec_cmd(cmd,self.conn)
+            if 'in use' in cmd_result:
+                fail_list.append(lv)
+
+        return fail_list # 返回已挂载而导致无法删除的lv
+
+
+    def umount_lv(self,list_lv):
+        for lv in list_lv:
+            cmd = f'umount {lv}'
+            utils.exec_cmd(cmd,self.conn)
+
+
+    def secondary_drbd(self,drbd):
+        cmd = f'drbdadm secondary {drbd}'
+        utils.exec_cmd(cmd,self.conn)
 
