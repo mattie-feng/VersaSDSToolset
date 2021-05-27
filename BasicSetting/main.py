@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*-
 import argparse
 import sys
 
@@ -5,7 +6,7 @@ import action
 import consts
 
 
-class InputParser():
+class InputParser(object):
 
     def __init__(self):
         self.parser = argparse.ArgumentParser(description="Basic Setting of System")
@@ -54,25 +55,33 @@ class InputParser():
         if args.version:
             print(f'Version: {consts.VERSION}')
         elif args.ip and args.device and args.gateway and args.password and args.rootpwd:
+            if not action.check_ip(args.ip):
+                print("\nPlease check the format of IP...\n")
+                sys.exit()
             install = action.InstallSoftware(args.password)
             root_config = action.RootConfig(args.password)
             ip_service = action.IpService(args.password)
-            print("Prepare to install software")
+            ssh_service = action.OpenSSHService(args.password)
+            print("\nPrepare to install software")
             if install.update_apt():
                 print(" Start to install network-manager")
-                if install.install_network_manager():
+                if install.install_software("network-manager"):
+                    print(" Start to set network-manager config")
                     if install.set_nmcli_config():
                         print("  Set IP on the device")
                         if ip_service.set_local_ip(args.device, args.ip, args.gateway):
                             ip_service.up_local_ip_service(args.device)
                 print(" Start to install openssh-server")
-                if install.install_openssh_server():
-                    print("  Set can be logged as root")
-                    if root_config.set_root_permit_login():
-                        print("  Set root password")
-                        root_config.set_root_password(args.rootpwd)
-                        print("  Restart openssh service")
-                        root_config.restart_openssh_service()
+                if install.install_software("openssh-server"):
+                    print("  Start openssh service")
+                    if ssh_service.oprt_ssh_service("start"):
+                        print("  Set can be logged as root")
+                        if root_config.set_root_permit_login():
+                            print("  Set root password")
+                            root_config.set_root_password(args.rootpwd)
+                            print("  Restart openssh service")
+                            ssh_service.oprt_ssh_service("restart")
+                print("\n")
             else:
                 sys.exit()
         else:
@@ -89,15 +98,7 @@ def main():
         run_program.parse()
     except KeyboardInterrupt:
         sys.stderr.write("\nClient exiting (received SIGINT)\n")
-    except PermissionError:
-        sys.stderr.write("\nPermission denied (log file or other)\n")
 
 
 if __name__ == '__main__':
-    # sc = control.Scheduler()
-    # sc.get_ssh_conn()
-    # sc.modify_hostname()
-    # sc.ssh_conn_build()
-    # sc.check_corosync()
-    # sc.packmaker_conf_change()
     main()

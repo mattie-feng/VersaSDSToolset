@@ -1,8 +1,7 @@
 # -*- coding:utf-8 -*-
-# import time
-# import re
 import subprocess
 import os
+import re
 
 
 def exec_cmd(cmd):
@@ -15,8 +14,17 @@ def exec_cmd(cmd):
         return {"st": True, "rt": result}
     else:
         print(f"  Failed to execute command: {cmd}")
-        print("  Error", p.stderr)
+        print("  Error message:\n", p.stderr)
         return {"st": False, "rt": p.stderr}
+
+
+def check_ip(ip):
+    """检查IP格式"""
+    re_ip = re.compile(
+        r'^((2([0-4]\d|5[0-5]))|[1-9]?\d|1\d{2})(\.((2([0-4]\d|5[0-5]))|[1-9]?\d|1\d{2})){3}$')
+    result = re_ip.match(ip)
+    if result:
+        return True
 
 
 def get_file(path, type=None):
@@ -42,9 +50,9 @@ class InstallSoftware(object):
         if result["st"]:
             return True
 
-    def install_network_manager(self):
-        """安装network-manager"""
-        cmd = f"echo {self.password} | sudo -S apt install network-manager -y"
+    def install_software(self, name):
+        """根据软件名安装对应软件"""
+        cmd = f"echo {self.password} | sudo -S apt install {name} -y"
         result = exec_cmd(cmd)
         if result["st"]:
             return True
@@ -66,17 +74,14 @@ class InstallSoftware(object):
                     if result_restart_service["st"]:
                         return True
 
-    def install_openssh_server(self):
-        """安装openssh-server"""
-        cmd = f"echo {self.password} | sudo -S apt install openssh-server -y"
-        result = exec_cmd(cmd)
-        if result["st"]:
-            if self.start_openssh_service():
-                return True
 
-    def start_openssh_service(self):
-        """启动openssh服务"""
-        cmd = f"echo {self.password} | sudo -S /etc/init.d/ssh start"
+class OpenSSHService(object):
+    def __init__(self, password):
+        self.password = password
+
+    def oprt_ssh_service(self, status):
+        """启动、停止、重启openssh服务"""
+        cmd = f"echo {self.password} | sudo -S /etc/init.d/ssh {status}"
         result = exec_cmd(cmd)
         if result["st"]:
             return True
@@ -117,13 +122,6 @@ class RootConfig(object):
     def set_root_permit_login(self):
         """允许以root用户登录"""
         cmd = f"echo {self.password} | sudo sed -i 's/PermitRootLogin prohibit-password/#PermitRootLogin prohibit-password\\nPermitRootLogin yes/g' /etc/ssh/sshd_config"
-        result = exec_cmd(cmd)
-        if result["st"]:
-            return True
-
-    def restart_openssh_service(self):
-        """启动openssh服务"""
-        cmd = f"echo {self.password} | sudo -S /etc/init.d/ssh restart"
         result = exec_cmd(cmd)
         if result["st"]:
             return True
