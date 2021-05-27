@@ -94,7 +94,7 @@ class IpService(object):
     def set_local_ip(self, device, ip, gateway, netmask=24):
         """在对应的设备上设置IP地址"""
         connection_name = 'vtel_' + device
-        cmd = f"echo {self.password} | sudo -S nmcli connection add con-name {connection_name} type ethernet ifname {device} ipv4.addresses {ip}/{netmask} ipv4.gateway {gateway} ipv4.method manual"
+        cmd = f"echo {self.password} | sudo -S nmcli connection add con-name {connection_name} type ethernet ifname {device} ipv4.addresses {ip}/{netmask} ipv4.gateway {gateway} ipv4.dns 114.114.114.114 ipv4.method manual"
         result = exec_cmd(cmd)
         if result["st"]:
             return True
