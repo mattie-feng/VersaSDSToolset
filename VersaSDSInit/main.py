@@ -192,8 +192,12 @@ def main():
 if __name__  == '__main__':
     # sc = control.Scheduler()
     # sc.get_ssh_conn()
-    # # sc.build_ha_controller()
-    # # sc.backup_linstordb()
-    # sc.destroy_linstordb()
+    # # # sc.build_ha_controller()
+    # # # sc.backup_linstordb()
+    # # sc.destroy_linstordb()
+    #
+    # sc.set_noninteractive()
+    # sc.install()
+
     main()
 

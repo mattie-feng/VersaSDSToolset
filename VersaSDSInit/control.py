@@ -365,10 +365,30 @@ class Scheduler():
 
 
 
+    def set_noninteractive(self):
+        for ssh in self.list_ssh:
+            handler = action.Install(ssh)
+            handler.set_noninteractive()
 
 
 
-        
+    def install(self):
+
+        lst = []
+
+        for ssh in self.list_ssh:
+            handler = action.Install(ssh)
+            lst.append(gevent.spawn(handler.install_drbd_utils))
+            lst.append(gevent.spawn(handler.install_drbd_dkms))
+
+
+        gevent.joinall(lst)
+
+        return [i.value for i in lst]
+
+
+
+
 
 
 
