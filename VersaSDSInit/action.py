@@ -593,24 +593,59 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
 
 
 class Install():
-    def __init__(self,conn):
+    def __init__(self,conn=None):
         self.conn = conn
 
     def remove_drbd_dkms(self):
         cmd = 'apt purge -y drbd-utils'
         utils.exec_cmd(cmd,self.conn)
 
+
+    def remove_postfix(self):
+        cmd = 'apt purge -y postfix'
+        utils.exec_cmd(cmd, self.conn)
+
     def set_noninteractive(self):
         cmd = 'export DEBIAN_FRONTEND=noninteractive'
         utils.exec_cmd(cmd,self.conn)
 
+
+    def install_spc(self):
+        cmd1 = 'apt install -y software-properties-common'
+        cmd2 = 'add-apt-repository -y ppa:linbit/linbit-drbd9-stack'
+        utils.exec_cmd(cmd1,self.conn)
+        utils.exec_cmd(cmd2,self.conn)
+
+    def apt_update(self):
+        cmd = 'apt -y update'
+        utils.exec_cmd(cmd,self.conn)
+
     def install_drbd_utils(self):
         cmd = 'apt install -y drbd-utils'
-        return (utils.exec_cmd(cmd,self.conn))
+        utils.exec_cmd(cmd,self.conn)
 
     def install_drbd_dkms(self):
         cmd = 'apt install -y drbd-dkms'
-        return (utils.exec_cmd(cmd,self.conn))
+        utils.exec_cmd(cmd,self.conn)
+
+
+    def install_linstor(self):
+        cmd = 'apt install -y linstor-controller linstor-satellite linstor-client'
+        utils.exec_cmd(cmd, self.conn)
+
+    def install_lvm2(self):
+        cmd ='apt install -y lvm2'
+        utils.exec_cmd(cmd,self.conn)
+
+
+    def install_pacemaker(self):
+        cmd = 'apt install -y pacemaker crmsh corosync ntpdate'
+        utils.exec_cmd(cmd,self.conn)
+
+    def install_targetcli(self):
+        cmd = 'apt install -y targetcli-fb'
+        utils.exec_cmd(cmd, self.conn)
+
 
 
 

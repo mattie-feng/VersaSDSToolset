@@ -152,13 +152,31 @@ class VersaSDSTools():
             sys.exit()
         print('*success*')
 
+    def install_soft(self):
+
+
 
     def main_usage(self, args):
         if args.version:
             print(f'Pacemaker Init: {consts.VERSION}')
         else:
             self.print_help(self.parser)
-
+        sc = control.VersaSDSSoft()
+        sc.get_ssh_conn()
+        print('添加linbit-drbd库，并更新')
+        sc.install_spc()
+        sc.apt_update()
+        print('开始安装drbd相关软件')
+        sc.install_drbd()
+        sc.set_noninteractive()
+        print('开始linstor安装')
+        sc.install_linstor()
+        print('开始lvm安装')
+        sc.install_lvm2()
+        print('开始pacemaker相关软件安装')
+        sc.install_pacemaker()
+        print('开始targetcli安装')
+        sc.install_targetcli()
 
 
 
@@ -190,14 +208,35 @@ def main():
 
 
 if __name__  == '__main__':
-    # sc = control.Scheduler()
-    # sc.get_ssh_conn()
+    import datetime
+    import time
+
+
+    sc = control.VersaSDSSoft()
+    sc.get_ssh_conn()
     # # # sc.build_ha_controller()
     # # # sc.backup_linstordb()
     # # sc.destroy_linstordb()
     #
-    # sc.set_noninteractive()
-    # sc.install()
 
-    main()
+    # t1 = datetime.datetime.now()
+    # sc.set_noninteractive()
+    t2 = datetime.datetime.now()
+    # print('添加linbit-drbd库，并更新')
+    # sc.install_spc()
+    # sc.apt_update()
+    # time.sleep(1)
+    # print('开始linstor安装')
+    # sc.install_linstor()
+    # time.sleep(1)
+    # print('开始lvm安装')
+    # sc.install_lvm2()
+    # sc.install2()
+    # time.sleep(1)
+    sc.install_pacemaker()
+    sc.install_targetcli()
+    t3 = datetime.datetime.now()
+    print(t3-t2)
+
+    # main()
 
