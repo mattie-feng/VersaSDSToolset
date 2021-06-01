@@ -247,9 +247,6 @@ def get_hostname():
 
 
 def exec_cmd(cmd,conn=None):
-
-
-
     if conn:
         result = conn.exec_cmd(cmd)
     else:
@@ -268,7 +265,6 @@ class Log():
 
     def __new__(cls, *args, **kwargs):
         if not hasattr(cls, '_instance'):
-            print('new 一次')
             Log._instance = super().__new__(cls)
             Log._instance.logger = logging.getLogger()
             Log._instance.logger.setLevel(logging.INFO)

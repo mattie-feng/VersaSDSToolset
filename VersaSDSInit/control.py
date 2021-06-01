@@ -371,80 +371,70 @@ class VersaSDSSoft(Scheduler):
 
 
     def set_noninteractive(self):
+        lst = []
         for ssh in self.list_ssh:
-            handler = action.Install(ssh)
-            handler.set_noninteractive()
+            handler = action.DRBD(ssh)
+            lst.append(gevent.spawn(handler.set_noninteractive))
+        gevent.joinall(lst)
 
 
     def apt_update(self):
         lst = []
         for ssh in self.list_ssh:
-            handler = action.Install(ssh)
+            handler = action.DRBD(ssh)
             lst.append(gevent.spawn(handler.apt_update))
         gevent.joinall(lst)
-        return True
 
 
 
     def install_spc(self):
         lst = []
         for ssh in self.list_ssh:
-            handler = action.Install(ssh)
+            handler = action.DRBD(ssh)
             lst.append(gevent.spawn(handler.install_spc))
         gevent.joinall(lst)
-        return True
 
 
 
     def install_drbd(self):
         lst = []
         for ssh in self.list_ssh:
-            handler = action.Install(ssh)
+            handler = action.DRBD(ssh)
             lst.append(gevent.spawn(handler.install_drbd_utils))
             lst.append(gevent.spawn(handler.install_drbd_dkms))
         gevent.joinall(lst)
-        return True
 
 
     def install_linstor(self):
         lst = []
         for ssh in self.list_ssh:
-            handler = action.Install(ssh)
-            lst.append(gevent.spawn(handler.install_linstor))
+            handler = action.Linstor(ssh)
+            lst.append(gevent.spawn(handler.install))
         gevent.joinall(lst)
-        return True
 
 
     def install_lvm2(self):
         lst = []
         for ssh in self.list_ssh:
-            handler = action.Install(ssh)
-            lst.append(gevent.spawn(handler.install_lvm2))
+            handler = action.LVM(ssh)
+            lst.append(gevent.spawn(handler.install))
         gevent.joinall(lst)
-        return True
-
 
 
     def install_pacemaker(self):
         lst = []
         for ssh in self.list_ssh:
-            handler = action.Install(ssh)
-            lst.append(gevent.spawn(handler.install_pacemaker))
+            handler = action.Pacemaker(ssh)
+            lst.append(gevent.spawn(handler.install))
         gevent.joinall(lst)
-        return True
 
 
     def install_targetcli(self):
         lst = []
         for ssh in self.list_ssh:
-            handler = action.Install(ssh)
-            lst.append(gevent.spawn(handler.install_targetcli))
+            handler = action.TargetCLI(ssh)
+            lst.append(gevent.spawn(handler.install))
         gevent.joinall(lst)
-        return True
-
-
-
-
 
 
 
