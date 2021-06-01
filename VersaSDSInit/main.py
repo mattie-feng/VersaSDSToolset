@@ -2,6 +2,7 @@ import argparse
 import sys
 import os
 
+sys.path.append('../')
 import control
 import utils
 import consts
@@ -18,6 +19,11 @@ class VersaSDSTools():
     def setup_parser(self):
         subp = self.parser.add_subparsers(metavar='',dest='subargs_vtel')
 
+        self.parser.add_argument('-v',
+                                 '--version',
+                                 dest='version',
+                                 help='Show current version',
+                                 action='store_true')
 
         # cmd:parser
         parser_pc = subp.add_parser(
@@ -54,7 +60,15 @@ class VersaSDSTools():
         parser_ls_bk.set_defaults(func=self.backup_linstor)
         parser_ls_del.set_defaults(func=self.delete_linstordb)
 
-        self.parser.set_defaults(func=self.print_help)
+        parser_install = subp.add_parser(
+            'install',
+            help='Install VersaSDS software'
+        )
+        parser_install.set_defaults(func=self.install_soft)
+
+
+
+        self.parser.set_defaults(func=self.main_usage)
 
 
     def print_help(self, args):
@@ -152,14 +166,33 @@ class VersaSDSTools():
             sys.exit()
         print('*success*')
 
+    def install_soft(self,args):
+        sc = control.VersaSDSSoft()
+        sc.get_ssh_conn()
+        print('*start*')
+        print('添加linbit-drbd库，并更新')
+        sc.install_spc()
+        sc.apt_update()
+        print('开始安装drbd相关软件')
+        sc.install_drbd()
+        sc.set_noninteractive()
+        print('开始linstor安装')
+        sc.install_linstor()
+        print('开始lvm安装')
+        sc.install_lvm2()
+        print('开始pacemaker相关软件安装')
+        sc.install_pacemaker()
+        print('开始targetcli安装')
+        sc.install_targetcli()
+        print('*success*')
+
+
 
     def main_usage(self, args):
         if args.version:
-            print(f'Pacemaker Init: {consts.VERSION}')
+            print(f'Version: {consts.VERSION}')
         else:
             self.print_help(self.parser)
-
-
 
 
     def parse(self):  # 调用入口
@@ -190,10 +223,11 @@ def main():
 
 
 if __name__  == '__main__':
-    # sc = control.Scheduler()
+    # sc = control.VersaSDSSoft()
     # sc.get_ssh_conn()
-    # # sc.build_ha_controller()
-    # # sc.backup_linstordb()
-    # sc.destroy_linstordb()
+    # # # sc.build_ha_controller()
+    # # # sc.backup_linstordb()
+    # # sc.destroy_linstordb()
+
     main()
 

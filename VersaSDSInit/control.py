@@ -15,7 +15,6 @@ timeout = gevent.Timeout(60)
 
 
 
-
 class Scheduler():
     """
     多协程调度
@@ -365,16 +364,77 @@ class Scheduler():
 
 
 
+class VersaSDSSoft(Scheduler):
+
+    def __init__(self):
+        super().__init__()
+
+
+    def set_noninteractive(self):
+        lst = []
+        for ssh in self.list_ssh:
+            handler = action.DRBD(ssh)
+            lst.append(gevent.spawn(handler.set_noninteractive))
+        gevent.joinall(lst)
+
+
+    def apt_update(self):
+        lst = []
+        for ssh in self.list_ssh:
+            handler = action.DRBD(ssh)
+            lst.append(gevent.spawn(handler.apt_update))
+        gevent.joinall(lst)
 
 
 
-        
+    def install_spc(self):
+        lst = []
+        for ssh in self.list_ssh:
+            handler = action.DRBD(ssh)
+            lst.append(gevent.spawn(handler.install_spc))
+        gevent.joinall(lst)
 
 
 
+    def install_drbd(self):
+        lst = []
+        for ssh in self.list_ssh:
+            handler = action.DRBD(ssh)
+            lst.append(gevent.spawn(handler.install_drbd_utils))
+            lst.append(gevent.spawn(handler.install_drbd_dkms))
+        gevent.joinall(lst)
 
 
+    def install_linstor(self):
+        lst = []
+        for ssh in self.list_ssh:
+            handler = action.Linstor(ssh)
+            lst.append(gevent.spawn(handler.install))
+        gevent.joinall(lst)
 
+
+    def install_lvm2(self):
+        lst = []
+        for ssh in self.list_ssh:
+            handler = action.LVM(ssh)
+            lst.append(gevent.spawn(handler.install))
+        gevent.joinall(lst)
+
+
+    def install_pacemaker(self):
+        lst = []
+        for ssh in self.list_ssh:
+            handler = action.Pacemaker(ssh)
+            lst.append(gevent.spawn(handler.install))
+        gevent.joinall(lst)
+
+
+    def install_targetcli(self):
+        lst = []
+        for ssh in self.list_ssh:
+            handler = action.TargetCLI(ssh)
+            lst.append(gevent.spawn(handler.install))
+        gevent.joinall(lst)
 
 
 
