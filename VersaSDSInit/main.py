@@ -74,6 +74,19 @@ class VersaSDSTools():
     def print_help(self, args):
         self.parser.print_help()
 
+
+    def main_usage(self, args):
+        if args.version:
+            print(f'Version: {consts.VERSION}')
+        else:
+            self.print_help(self.parser)
+
+
+    def parse(self):  # 调用入口
+        args = self.parser.parse_args()
+        args.func(args)
+
+
     def init_pacemaker_cluster(self, args):
         controller = control.Scheduler()
         print('*start*')
@@ -188,22 +201,21 @@ class VersaSDSTools():
 
 
 
-    def main_usage(self, args):
-        if args.version:
-            print(f'Version: {consts.VERSION}')
-        else:
-            self.print_help(self.parser)
-
-
-    def parse(self):  # 调用入口
-        args = self.parser.parse_args()
-        args.func(args)
-
-
     def delete_linstordb(self,args):
         controller = control.Scheduler()
         controller.get_ssh_conn()
         controller.destroy_linstordb()
+
+
+    def show_version(self,*args):
+        controller = control.VersaSDSSoft()
+        controller.get_ssh_conn()
+        iter_version = controller.get_all_version()
+        table = utils.Table()
+        table.header = ['node', 'os_system', 'kernel', 'drbd_kernel_version', 'linstor', 'targetcli', 'pacemaker']
+        for i in iter_version:
+            table.add_data(i)
+        table.print_table()
 
 
 
@@ -228,6 +240,9 @@ if __name__  == '__main__':
     # # # sc.build_ha_controller()
     # # # sc.backup_linstordb()
     # # sc.destroy_linstordb()
-
     main()
+
+    # cli = VersaSDSTools()
+
+    # cli.show_version()
 
