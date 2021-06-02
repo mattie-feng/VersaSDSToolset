@@ -386,7 +386,6 @@ class VersaSDSSoft(Scheduler):
         gevent.joinall(lst)
 
 
-
     def install_spc(self):
         lst = []
         for ssh in self.list_ssh:
@@ -395,13 +394,11 @@ class VersaSDSSoft(Scheduler):
         gevent.joinall(lst)
 
 
-
     def install_drbd(self):
         lst = []
         for ssh in self.list_ssh:
             handler = action.DRBD(ssh)
-            lst.append(gevent.spawn(handler.install_drbd_utils))
-            lst.append(gevent.spawn(handler.install_drbd_dkms))
+            lst.append(gevent.spawn(handler.install_drbd))
         gevent.joinall(lst)
 
 
@@ -435,6 +432,34 @@ class VersaSDSSoft(Scheduler):
             handler = action.TargetCLI(ssh)
             lst.append(gevent.spawn(handler.install))
         gevent.joinall(lst)
+
+
+    def get_all_version(self):
+        # 返回一个迭代器
+        lst = []
+
+        for ssh in self.list_ssh:
+            host = action.Host(ssh)
+            drbd = action.DRBD(ssh)
+            linstor = action.Linstor(ssh)
+            targetcli = action.TargetCLI(ssh)
+            pacemaker = action.Pacemaker(ssh)
+
+            lst.append(gevent.spawn(host.get_hostname))
+            lst.append(gevent.spawn(host.get_sys_version))
+            lst.append(gevent.spawn(host.get_kernel_version))
+            lst.append(gevent.spawn(drbd.get_version))
+            lst.append(gevent.spawn(linstor.get_version))
+            lst.append(gevent.spawn(targetcli.get_version))
+            lst.append(gevent.spawn(pacemaker.get_version))
+        gevent.joinall(lst)
+        result = [job.value for job in lst]
+        for i in range(0,len(result),7):
+            yield result[i:i+7]
+
+
+
+
 
 
 
