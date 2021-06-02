@@ -1,0 +1,19 @@
+cluster: cluster
+backup_path: /backupdir
+node:
+- hostname: vince2
+  port: 22
+  private_ip:
+    device: ens192
+    gateway: 10.203.2.1
+    ip: 10.203.2.186
+  public_ip: 10.203.1.157
+  root_password: password
+- hostname: vince3
+  port: 22
+  private_ip:
+    device: ens192
+    gateway: 10.203.2.1
+    ip: 10.203.2.187
+  public_ip: 10.203.1.195
+  root_password: password

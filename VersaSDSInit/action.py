@@ -193,6 +193,16 @@ class Pacemaker():
         return True
 
 
+    def install(self):
+        cmd = 'apt install -y pacemaker crmsh corosync ntpdate'
+        utils.exec_cmd(cmd,self.conn)
+
+
+    def get_version(self):
+        cmd = 'pacemaker --version'
+        pass
+
+
 
 class TargetCLI():
     def __init__(self,conn=None):
@@ -235,6 +245,20 @@ class TargetCLI():
             return False
 
         return True
+
+
+    def install(self):
+        cmd = 'apt install -y targetcli-fb'
+        utils.exec_cmd(cmd, self.conn)
+
+
+    def get_version(self):
+        cmd = 'targetcli --version'
+        result = utils.exec_cmd(cmd,self.conn)
+        # result = '/bin/sh: 1: targetcli: not found'
+        version = re.findall('version\s*([\w\.]*)',result)
+        if version:
+            return version[0]
 
 
 
@@ -589,4 +613,70 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
     def secondary_drbd(self,drbd):
         cmd = f'drbdadm secondary {drbd}'
         utils.exec_cmd(cmd,self.conn)
+
+
+
+class DRBD():
+    def __init__(self,conn):
+        self.conn = conn
+
+
+    def set_noninteractive(self):
+        cmd = 'export DEBIAN_FRONTEND=noninteractive'
+        utils.exec_cmd(cmd, self.conn)
+
+    def install_spc(self):
+        cmd1 = 'apt install -y software-properties-common'
+        cmd2 = 'add-apt-repository -y ppa:linbit/linbit-drbd9-stack'
+        utils.exec_cmd(cmd1, self.conn)
+        utils.exec_cmd(cmd2, self.conn)
+
+    def apt_update(self):
+        cmd = 'apt -y update'
+        utils.exec_cmd(cmd, self.conn)
+
+    def install_drbd_utils(self):
+        cmd = 'apt install -y drbd-utils'
+        utils.exec_cmd(cmd, self.conn)
+
+    def install_drbd_dkms(self):
+        cmd = 'apt install -y drbd-dkms'
+        utils.exec_cmd(cmd, self.conn)
+
+
+    def get_drbd_version(self):
+        cmd = 'drbdadm --version'
+        utils.exec_cmd(cmd,self.conn)
+
+
+class Linstor():
+    def __init__(self,conn):
+        self.conn = conn
+
+
+    def install(self):
+        cmd = 'apt install -y linstor-controller linstor-satellite linstor-client'
+        utils.exec_cmd(cmd, self.conn)
+
+
+    def get_version(self):
+        cmd = 'linstor --version'
+        utils.exec_cmd(cmd, self.conn)
+
+
+
+
+
+class LVM():
+    def __init__(self,conn):
+        self.conn = conn
+
+
+    def install(self):
+        cmd ='apt install -y lvm2'
+        utils.exec_cmd(cmd,self.conn)
+
+
+
+
 
