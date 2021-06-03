@@ -2,6 +2,7 @@
 import argparse
 import sys
 import action
+
 sys.path.append('../')
 import consts
 
@@ -51,20 +52,57 @@ class InputParser(object):
 
         self.parser.set_defaults(func=self.run_fun)
 
+    def collect_args(self, args):
+        conf_args = {}
+        ip = args.ip if args.ip else self.guide_check("IP", "10.203.1.78")
+        device = args.device if args.device else self.guide_check("Device", "ens160")
+        default_gateway = f"{'.'.join(ip.split('.')[:3])}.1"
+        gateway = args.gateway if args.gateway else self.guide_check("Gateway", default_gateway)
+        passwword = args.password if args.password else self.guide_check("User password", "password")
+        rootpwd = args.rootpwd if args.rootpwd else self.guide_check("Root password", "password")
+
+        conf_args["IP"] = ip
+        conf_args["Device"] = device
+        conf_args["Gateway"] = gateway
+        conf_args["User password"] = passwword
+        conf_args["Root password"] = rootpwd
+        print(conf_args)
+
+        return conf_args
+
+    def guide_check(self, target, default):
+        for i in range(3):
+            a = input(f"Input the value of '{target}' (default [{default}]): ")
+            if a.strip() == "":
+                return default
+            elif a.strip() == "exit":
+                sys.exit()
+            else:
+                if target in ["Gateway", "IP"]:
+                    if action.check_ip(a):
+                        return a
+                    else:
+                        print(f"Please check the format of {target}.Enter again or Press CTRL+C to quit")
+                else:
+                    return a
+
     def run_fun(self, args):
         if args.version:
             print(f'Version: {consts.VERSION}')
-        elif args.ip and args.device and args.gateway and args.password and args.rootpwd:
-            if not action.check_ip(args.ip):
-                print("\nPlease check the format of IP...\n")
-                sys.exit()
-            if not action.check_ip(args.gateway):
-                print("\nPlease check the format of Gateway...\n")
-                sys.exit()
-            install = action.InstallSoftware(args.password)
-            root_config = action.RootConfig(args.password)
-            ip_service = action.IpService(args.password)
-            ssh_service = action.OpenSSHService(args.password)
+        else:
+            if args.ip:
+                if not action.check_ip(args.ip):
+                    print("\nPlease check the format of IP...\n")
+                    sys.exit()
+            if args.gateway:
+                if not action.check_ip(args.gateway):
+                    print("\nPlease check the format of Gateway...\n")
+                    sys.exit()
+            conf_args = self.collect_args(args)
+            install = action.InstallSoftware(conf_args["User password"])
+            root_config = action.RootConfig(conf_args["User password"])
+            ip_service = action.IpService(conf_args["User password"])
+            ssh_service = action.OpenSSHService(conf_args["User password"])
             print("\nPrepare to install software...")
             if install.update_apt():
                 print("Start to install openssh-server")
@@ -74,21 +112,19 @@ class InputParser(object):
                         print("Set can be logged as root")
                         if root_config.set_root_permit_login():
                             print("Set root password")
-                            root_config.set_root_password(args.rootpwd)
+                            root_config.set_root_password(conf_args["Root password"])
                             print(" Restart openssh service")
                             ssh_service.oprt_ssh_service("restart")
                 print("Start to install network-manager")
                 if install.install_software("network-manager"):
                     print(" Start to set network-manager config")
                     if install.set_nmcli_config():
-                        print(f"Set {args.ip} on the {args.device}")
-                        if ip_service.set_local_ip(args.device, args.ip, args.gateway):
-                            ip_service.up_local_ip_service(args.device)
+                        print(f"Set {conf_args['IP']} on the {conf_args['Device']}")
+                        if ip_service.set_local_ip(conf_args['Device'], conf_args['IP'], conf_args['Gateway']):
+                            ip_service.up_local_ip_service(conf_args['Device'])
                 print("\n")
             else:
                 sys.exit()
-        else:
-            self.parser.print_help()
 
     def parse(self):  # 调用入口
         args = self.parser.parse_args()
