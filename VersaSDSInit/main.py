@@ -60,12 +60,22 @@ class VersaSDSTools():
         parser_ls_bk.set_defaults(func=self.backup_linstor)
         parser_ls_del.set_defaults(func=self.delete_linstordb)
 
+        # Build command: install
         parser_install = subp.add_parser(
             'install',
             help='Install VersaSDS software'
         )
         parser_install.set_defaults(func=self.install_soft)
 
+
+        # Build command: status
+        parser_status = subp.add_parser(
+            'status',
+            aliases=['st'],
+            help='Display the information of cluster/node system service and software'
+        )
+        parser_status.add_argument('node',nargs = '?',default = None)
+        parser_status.set_defaults(func=self.show_status)
 
 
         self.parser.set_defaults(func=self.main_usage)
@@ -187,8 +197,8 @@ class VersaSDSTools():
         sc.install_spc()
         sc.apt_update()
         print('开始安装drbd相关软件')
-        sc.install_drbd()
         sc.set_noninteractive()
+        sc.install_drbd()
         print('开始linstor安装')
         sc.install_linstor()
         print('开始lvm安装')
@@ -199,24 +209,41 @@ class VersaSDSTools():
         sc.install_targetcli()
         print('*success*')
 
-
-
     def delete_linstordb(self,args):
         controller = control.Scheduler()
         controller.get_ssh_conn()
         controller.destroy_linstordb()
 
 
-    def show_version(self,*args):
+    def show_status(self,args):
         controller = control.VersaSDSSoft()
         controller.get_ssh_conn()
-        iter_version = controller.get_all_version()
-        table = utils.Table()
-        table.header = ['node', 'os_system', 'kernel', 'drbd_kernel_version', 'linstor', 'targetcli', 'pacemaker']
-        for i in iter_version:
-            table.add_data(i)
-        table.print_table()
 
+        iter_service_status = controller.get_all_service_status()
+        table_status = utils.Table()
+        table_status.header = ['node', 'pacemaker', 'corosync', 'linstor-satellite', 'drbd', 'linstor-controller']
+        for i in iter_service_status:
+            if args.node:
+                if args.node == i[0]:
+                    table_status.add_data(i)
+                    break
+            else:
+                table_status.add_data(i)
+
+
+        iter_version = controller.get_all_version()
+        table_version = utils.Table()
+        table_version.header = ['node', 'os_system', 'kernel', 'drbd_kernel_version', 'linstor', 'targetcli', 'pacemaker']
+        for i in iter_version:
+            if args.node:
+                if args.node == i[0]:
+                    table_version.add_data(i)
+                    break
+            else:
+                table_version.add_data(i)
+
+        table_status.print_table()
+        table_version.print_table()
 
 
 
@@ -241,8 +268,4 @@ if __name__  == '__main__':
     # # # sc.backup_linstordb()
     # # sc.destroy_linstordb()
     main()
-
-    # cli = VersaSDSTools()
-
-    # cli.show_version()
 

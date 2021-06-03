@@ -91,9 +91,6 @@ class Host():
 
 
 
-        
-
-
 class Corosync():
     original_attr = {'cluster_name': 'debian',
                      'bindnetaddr': '127.0.0.1'}
@@ -364,7 +361,7 @@ class ServiceSet():
             return True
 
 
-    def check_linstor_pacemaker(self):
+    def check_pacemaker(self):
         cmd = 'systemctl status pacemaker'
         data = utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
