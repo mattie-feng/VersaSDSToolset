@@ -155,7 +155,7 @@ class Scheduler():
         cluster_name = self.cluster['cluster']
         packmaker = action.Pacemaker()
         if packmaker.check_crm_conf(cluster_name):
-            return [True]*len(self.list_ssh)
+            return [True] * len(self.list_ssh)
         else:
             return [False] * len(self.list_ssh)
 
@@ -206,7 +206,7 @@ class Scheduler():
             check_result.append(gevent.spawn(executor.check_drbd))
             check_result.append(gevent.spawn(executor.check_linstor_controller))
             check_result.append(gevent.spawn(executor.check_linstor_satellite))
-            check_result.append(gevent.spawn(executor.check_linstor_pacemaker))
+            check_result.append(gevent.spawn(executor.check_pacemaker))
             check_result.append(gevent.spawn(executor.check_corosync))
             gevent.joinall(check_result)
             check_result = [job.value for job in check_result]
@@ -434,6 +434,29 @@ class VersaSDSSoft(Scheduler):
         gevent.joinall(lst)
 
 
+
+    def get_all_service_status(self):
+        lst = []
+        for ssh in self.list_ssh:
+            service = action.ServiceSet(ssh)
+            host = action.Host(ssh)
+            lst.append(gevent.spawn(host.get_hostname))
+            lst.append(gevent.spawn(service.check_pacemaker))
+            lst.append(gevent.spawn(service.check_corosync))
+            lst.append(gevent.spawn(service.check_linstor_satellite))
+            lst.append(gevent.spawn(service.check_drbd))
+            lst.append(gevent.spawn(service.check_linstor_controller))
+
+        gevent.joinall(lst)
+        result = [job.value for job in lst]
+        for i in range(0,len(result),6):
+            node = result[i:i+6][:1]
+            status = ['enable' if i else 'disable' for i in result[i:i+6][1:]]
+            node.extend(status)
+            yield node
+
+
+
     def get_all_version(self):
         # 返回一个迭代器
         lst = []
@@ -456,6 +479,9 @@ class VersaSDSSoft(Scheduler):
         result = [job.value for job in lst]
         for i in range(0,len(result),7):
             yield result[i:i+7]
+
+
+
 
 
 
