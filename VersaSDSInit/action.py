@@ -165,6 +165,13 @@ class Corosync():
                 return
 
 
+    def get_version(self):
+        cmd = 'corosync -v'
+        result = utils.exec_cmd(cmd,self.conn)
+        version = re.findall('version\s\'(.*)\'',result)
+        if version:
+            return version[0]
+
 
 class Pacemaker():
     def __init__(self,conn=None):
@@ -645,10 +652,6 @@ class DRBD():
         self.conn = conn
 
 
-    def set_noninteractive(self):
-        cmd = 'export DEBIAN_FRONTEND=noninteractive'
-        utils.exec_cmd(cmd, self.conn)
-
     def install_spc(self):
         cmd1 = 'apt install -y software-properties-common'
         cmd2 = 'add-apt-repository -y ppa:linbit/linbit-drbd9-stack'
@@ -660,7 +663,7 @@ class DRBD():
         utils.exec_cmd(cmd, self.conn)
 
     def install_drbd(self):
-        cmd = 'apt install -y drbd-utils drbd-dkms'
+        cmd = 'export DEBIAN_FRONTEND=noninteractive && apt install -y drbd-utils drbd-dkms'
         utils.exec_cmd(cmd, self.conn)
 
 
@@ -700,5 +703,3 @@ class LVM():
     def install(self):
         cmd ='apt install -y lvm2'
         utils.exec_cmd(cmd,self.conn)
-
-
