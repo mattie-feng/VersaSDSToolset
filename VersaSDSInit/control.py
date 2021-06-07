@@ -369,15 +369,6 @@ class VersaSDSSoft(Scheduler):
     def __init__(self):
         super().__init__()
 
-
-    def set_noninteractive(self):
-        lst = []
-        for ssh in self.list_ssh:
-            handler = action.DRBD(ssh)
-            lst.append(gevent.spawn(handler.set_noninteractive))
-        gevent.joinall(lst)
-
-
     def apt_update(self):
         lst = []
         for ssh in self.list_ssh:
@@ -456,34 +447,42 @@ class VersaSDSSoft(Scheduler):
             yield node
 
 
-
-    def get_all_version(self):
-        # 返回一个迭代器
-        lst = []
-
+    def get_version(self,*args):
+        """
+        参数输入要获取版本信息的软件，支持sysos，syskernel，drbd，linstor，targetcli，pacemaker，corosync
+        返回数据的顺序与参数顺序一致
+        :param args:
+        :return:
+        """
+        coroutine_list = []
         for ssh in self.list_ssh:
             host = action.Host(ssh)
-            drbd = action.DRBD(ssh)
-            linstor = action.Linstor(ssh)
-            targetcli = action.TargetCLI(ssh)
-            pacemaker = action.Pacemaker(ssh)
+            coroutine_list.append(gevent.spawn(host.get_hostname))
+            for soft in args:
+                if soft == 'sysos':
+                    coroutine_list.append(gevent.spawn(host.get_sys_version))
+                elif soft == 'syskernel':
+                    coroutine_list.append(gevent.spawn(host.get_kernel_version))
+                elif soft == 'drbd':
+                    drbd = action.DRBD(ssh)
+                    coroutine_list.append(gevent.spawn(drbd.get_version))
+                elif soft == 'linstor':
+                    linstor = action.Linstor(ssh)
+                    coroutine_list.append(gevent.spawn(linstor.get_version))
+                elif soft == 'targetcli':
+                    targetcli = action.TargetCLI(ssh)
+                    coroutine_list.append(gevent.spawn(targetcli.get_version))
+                elif soft == 'pacemaker':
+                    pacemaker = action.Pacemaker(ssh)
+                    coroutine_list.append(gevent.spawn(pacemaker.get_version))
+                elif soft == 'corosync':
+                    corosync = action.Corosync(ssh)
+                    coroutine_list.append(gevent.spawn(corosync.get_version))
 
-            lst.append(gevent.spawn(host.get_hostname))
-            lst.append(gevent.spawn(host.get_sys_version))
-            lst.append(gevent.spawn(host.get_kernel_version))
-            lst.append(gevent.spawn(drbd.get_version))
-            lst.append(gevent.spawn(linstor.get_version))
-            lst.append(gevent.spawn(targetcli.get_version))
-            lst.append(gevent.spawn(pacemaker.get_version))
-        gevent.joinall(lst)
-        result = [job.value for job in lst]
-        for i in range(0,len(result),7):
-            yield result[i:i+7]
-
-
-
-
-
+        gevent.joinall(coroutine_list)
+        result = [job.value for job in coroutine_list]
+        for i in range(0,len(result),len(args)+1):
+            yield result[i:i+len(args)+1]
 
 
 
