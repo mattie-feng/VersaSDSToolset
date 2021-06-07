@@ -4,6 +4,7 @@ import os
 import re
 import yaml
 import pprint
+from linstor_api import LinstorAPI
 
 
 def exec_cmd(cmd):
@@ -48,43 +49,6 @@ class LVMOperation(object):
             # pprint.pprint(vgs_list)
             return vgs_list
 
-    def data_processing(self):
-        pv_list = self.get_pvs()
-        vg_list = self.get_vgs()
-        lv_list = self.get_lvs()
-
-        vg_dict = {}
-        for vg in vg_list:
-            vg_data = {'free size': None, 'total size': None, 'linstor storage pool': {'pool': None}}
-            pv_key = f'pvs({vg[1]})'
-            lv_key = f'lvs({vg[2]})'
-            vg_data['total size'] = vg[3]
-            vg_data['free size'] = vg[4]
-            vg_data[pv_key] = None
-            vg_data[lv_key] = None
-            pv_dict = {}
-            lv_dict = {}
-            for pv in pv_list:
-                if pv[1] == vg[0]:
-                    pv_dict[pv[0]] = pv[2]
-            vg_data[pv_key] = pv_dict
-
-            for lv in lv_list:
-                if lv[1] == vg[0] and not lv[4]:
-                    lv_dict[lv[0]] = {"size": lv[3]}
-            vg_data[lv_key] = lv_dict
-
-            for pool in lv_dict:
-                pool_dict = {}
-                for lv in lv_list:
-                    if lv[4] == pool:
-                        pool_dict[lv[0]] = {"size": lv[3]}
-                if len(pool_dict) != 0:
-                    pool_key = f'lvs({len(pool_dict)})'
-                    vg_data[lv_key][pool][pool_key] = pool_dict
-            vg_dict[vg[0]] = vg_data
-        return vg_dict
-
 
 class YamlData(object):
     def __init__(self):
@@ -105,26 +69,76 @@ class YamlData(object):
         with open("test2.yaml", 'w', encoding='utf-8') as f:
             yaml.dump(self.yaml_dict, f, default_flow_style=False)
 
-    def show(self, dict_vg):
+    def show(self, dict_vg, vg):
+        """以YAML格式展示JSON数据"""
         # dict_vg = self.vg_template(["vg1", "vg2"])
-        print(yaml.dump(dict_vg, sort_keys=False))
+        if vg:
+            print('-' * 10, vg, '-' * 10)
+            print(yaml.dump(dict_vg[vg], sort_keys=False))
+        else:
+            print(yaml.dump(dict_vg, sort_keys=False))
 
-    def vg_template(self, vg_list):
+    def lvm_processing(self, node):
+        lvm_data = LVMOperation()
+        pv_list = lvm_data.get_pvs()
+        vg_list = lvm_data.get_vgs()
+        lv_list = lvm_data.get_lvs()
+        api = LinstorAPI()
+        sp = api.get_storagepool([node])
+        # pprint.pprint(sp)
+
         vg_dict = {}
         for vg in vg_list:
-            vg_data = {'free size': None, 'total size': None, 'linstor storage pool': {'pool': None}, 'pvs': None,
-                       'lvs': None}
-            vg_dict[vg] = vg_data
+            vg_data = {'free size': None, 'total size': None, 'linstor storage pool': {'sp name': None}}
+            pv_key = f'pvs({vg[1]})'
+            lv_key = f'lvs({vg[2]})'
+            vg_data['total size'] = vg[3]
+            vg_data['free size'] = vg[4]
+            vg_data[pv_key] = None
+            vg_data[lv_key] = None
+            pv_dict = {}
+            lv_dict = {}
+            for pv in pv_list:
+                if pv[1] == vg[0]:
+                    pv_dict[pv[0]] = pv[2]
+            vg_data[pv_key] = pv_dict
+
+            for lv in lv_list:
+                if lv[1] == vg[0] and not lv[4]:
+                    if lv[2] == "-wi-ao----":
+                        lv_dict[lv[0]] = {"size": lv[3], 'linstor resource': True}
+                    elif lv[2] == "twi-aotz--":
+                        lv_dict[lv[0]] = {"size": lv[3], 'linstor storage pool': {'sp name': None}}
+                    else:
+                        lv_dict[lv[0]] = {"size": lv[3], 'linstor resource': False}
+            vg_data[lv_key] = lv_dict
+
+            for pool in lv_dict:
+                pool_dict = {}
+                for lv in lv_list:
+                    if lv[4] == pool:
+                        pool_dict[lv[0]] = {"size": lv[3], 'linstor resource': False}
+                if len(pool_dict) != 0:
+                    pool_key = f'lvs({len(pool_dict)})'
+                    vg_data[lv_key][pool][pool_key] = pool_dict
+
+            vg_dict[vg[0]] = vg_data
+            for i in sp:
+                if i["PoolName"] == vg[0]:
+                    vg_data["linstor storage pool"]["sp name"] = i["StoragePool"]
+
+            vg_dict[vg[0]] = vg_data
         return vg_dict
 
 
 if __name__ == '__main__':
     # conf.read_yaml()
     lvm_operation = LVMOperation()
-    dict_vg = lvm_operation.data_processing()
-    lvm_operation.get_vgs()
-    lvm_operation.get_pvs()
-    lvm_operation.get_lvs()
+    # lvm_operation.get_vgs()
+    # lvm_operation.get_pvs()
+    # lvm_operation.get_lvs()
 
     conf = YamlData()
-    conf.show(dict_vg)
+    dict_vg = conf.lvm_processing("mattie1")
+    conf.show(dict_vg, None)
+    # conf.show(dict_vg, "vgsdb1")
