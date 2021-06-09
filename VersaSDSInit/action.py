@@ -27,6 +27,11 @@ class IpService(object):
         utils.exec_cmd(cmd, self.conn)
 
 
+    def get_networkcard_data(self):
+        cmd_result = utils.exec_cmd('ip a',self.conn)
+
+
+
 class Host():
     def __init__(self,conn=None):
         self.conn = conn
@@ -40,6 +45,10 @@ class Host():
     def modify_hostsfile(self,ip,hostname):
         cmd = f"sed -i 's/{ip}.*/{ip}\t{hostname}/g' /etc/hosts"
         utils.exec_cmd(cmd,self.conn)
+
+
+    def get_hostname(self):
+        return utils.exec_cmd('hostname',self.conn)
 
 
     def check_hostname(self,hostname):
@@ -66,6 +75,19 @@ class Host():
         hosts = re.findall('ssh-rsa\s[\s\S]*?\sroot@(.*)', authorized_keys)
         if set(cluster_hosts) <= set(hosts):
             return True
+
+
+    def get_kernel_version(self):
+        cmd = 'uname -r'
+        return utils.exec_cmd(cmd,self.conn)
+
+
+    def get_sys_version(self):
+        cmd = 'lsb_release -a'
+        result = utils.exec_cmd(cmd,self.conn)
+        sys_version = re.findall('Description:\s*(.*)',result)
+        if sys_version:
+            return sys_version[0]
 
 
 
@@ -143,6 +165,13 @@ class Corosync():
                 return
 
 
+    def get_version(self):
+        cmd = 'corosync -v'
+        result = utils.exec_cmd(cmd,self.conn)
+        version = re.findall('version\s\'(.*)\'',result)
+        if version:
+            return version[0]
+
 
 class Pacemaker():
     def __init__(self,conn=None):
@@ -199,8 +228,11 @@ class Pacemaker():
 
 
     def get_version(self):
-        cmd = 'pacemaker --version'
-        pass
+        cmd = 'crm st | grep Current | cat'
+        result = utils.exec_cmd(cmd,self.conn)
+        version = re.findall('\(version\s(.*)\)\s',result)
+        if version:
+            return version[0]
 
 
 
@@ -255,8 +287,7 @@ class TargetCLI():
     def get_version(self):
         cmd = 'targetcli --version'
         result = utils.exec_cmd(cmd,self.conn)
-        # result = '/bin/sh: 1: targetcli: not found'
-        version = re.findall('version\s*([\w\.]*)',result)
+        version = re.findall('version\s*(.*)',result)
         if version:
             return version[0]
 
@@ -337,7 +368,7 @@ class ServiceSet():
             return True
 
 
-    def check_linstor_pacemaker(self):
+    def check_pacemaker(self):
         cmd = 'systemctl status pacemaker'
         data = utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
@@ -617,13 +648,9 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
 
 
 class DRBD():
-    def __init__(self,conn):
+    def __init__(self,conn=None):
         self.conn = conn
 
-
-    def set_noninteractive(self):
-        cmd = 'export DEBIAN_FRONTEND=noninteractive'
-        utils.exec_cmd(cmd, self.conn)
 
     def install_spc(self):
         cmd1 = 'apt install -y software-properties-common'
@@ -635,22 +662,23 @@ class DRBD():
         cmd = 'apt -y update'
         utils.exec_cmd(cmd, self.conn)
 
-    def install_drbd_utils(self):
-        cmd = 'apt install -y drbd-utils'
-        utils.exec_cmd(cmd, self.conn)
-
-    def install_drbd_dkms(self):
-        cmd = 'apt install -y drbd-dkms'
+    def install_drbd(self):
+        cmd = 'export DEBIAN_FRONTEND=noninteractive && apt install -y drbd-utils drbd-dkms'
         utils.exec_cmd(cmd, self.conn)
 
 
-    def get_drbd_version(self):
+    def get_version(self):
         cmd = 'drbdadm --version'
-        utils.exec_cmd(cmd,self.conn)
+        result = utils.exec_cmd(cmd,self.conn)
+        version_kernel = re.findall('DRBD_KERNEL_VERSION=(.*)',result)
+        # version_drbdadm = re.findall('')
+        if version_kernel:
+            return version_kernel[0]
+
 
 
 class Linstor():
-    def __init__(self,conn):
+    def __init__(self,conn=None):
         self.conn = conn
 
 
@@ -661,9 +689,10 @@ class Linstor():
 
     def get_version(self):
         cmd = 'linstor --version'
-        utils.exec_cmd(cmd, self.conn)
-
-
+        result = utils.exec_cmd(cmd, self.conn)
+        version = re.findall('linstor (.*);',result)
+        if version:
+            return version[0]
 
 
 
@@ -671,12 +700,6 @@ class LVM():
     def __init__(self,conn):
         self.conn = conn
 
-
     def install(self):
         cmd ='apt install -y lvm2'
         utils.exec_cmd(cmd,self.conn)
-
-
-
-
-

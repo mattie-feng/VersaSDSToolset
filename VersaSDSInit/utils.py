@@ -53,7 +53,7 @@ class SSHConn(object):
             err = stderr.read()
             if len(err) > 0:
                 # 记录一下log
-                pass
+                return err
             #     print('''Excute command "{}" failed on "{}" with error:
             # "{}"'''.format(command, self._host, err.strip()))
 
@@ -212,6 +212,8 @@ class Table():
     def add_data(self,list_data):
         self.table.add_row(list_data)
 
+    def add_column(self,fieldname,list_column):
+        self.table.add_column(fieldname,list_column)
 
     def print_table(self):
         self.table.field_names = self.header
@@ -252,7 +254,8 @@ def exec_cmd(cmd,conn=None):
     else:
         result = subprocess.getoutput(cmd)
     result = result.decode() if isinstance(result,bytes) else result
-    Log().logger.info(result)
+    log_data = f'{conn._host if conn else "localhost"} - {result}'
+    Log().logger.info(log_data)
     if result:
         result = result.rstrip('\n')
     return result
@@ -275,7 +278,7 @@ class Log():
     def set_handler(logger):
         fh = logging.FileHandler('./VersaSDSLog.log', mode='a')
         fh.setLevel(logging.DEBUG)  # 输出到file的log等级的开关
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s: %(message)s")
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         fh.setFormatter(formatter)
         logger.addHandler(fh)
 

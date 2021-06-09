@@ -17,3 +17,5 @@ node:
     ip: 10.203.2.187
   public_ip: 10.203.1.195
   root_password: password
+
+
