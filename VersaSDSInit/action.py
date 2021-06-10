@@ -339,7 +339,9 @@ class ServiceSet():
         time.sleep(0)
         result = re.findall('/lib/systemd/system/drbd.service; disabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'disable'
+        else:
+            return 'enable'
 
 
     def check_linstor_controller(self):
@@ -348,7 +350,9 @@ class ServiceSet():
         time.sleep(0)
         result = re.findall('/lib/systemd/system/linstor-controller.service; disabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'disable'
+        else:
+            return 'enable'
 
 
     # 没办法验证
@@ -365,7 +369,9 @@ class ServiceSet():
         time.sleep(0)
         result = re.findall('/lib/systemd/system/linstor-satellite.service; enabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'enable'
+        else:
+            return 'disable'
 
 
     def check_pacemaker(self):
@@ -374,7 +380,9 @@ class ServiceSet():
         time.sleep(0)
         result = re.findall('/lib/systemd/system/pacemaker.service; enabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'enable'
+        else:
+            return 'disable'
 
 
     def check_corosync(self):
@@ -383,7 +391,9 @@ class ServiceSet():
         time.sleep(0)
         result = re.findall('/lib/systemd/system/corosync.service; enabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'enable'
+        else:
+            return 'disable'
 
 
 
