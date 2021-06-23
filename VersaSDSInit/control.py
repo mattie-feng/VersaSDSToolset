@@ -210,11 +210,10 @@ class Scheduler():
             check_result.append(gevent.spawn(executor.check_corosync))
             gevent.joinall(check_result)
             check_result = [job.value for job in check_result]
-            if all(check_result):
+            if check_result == ['disable','disable','enable','enable','enable']:
                 lst.append(True)
             else:
                 lst.append(False)
-
         return lst
 
 
@@ -441,10 +440,7 @@ class VersaSDSSoft(Scheduler):
         gevent.joinall(lst)
         result = [job.value for job in lst]
         for i in range(0,len(result),6):
-            node = result[i:i+6][:1]
-            status = ['enable' if i else 'disable' for i in result[i:i+6][1:]]
-            node.extend(status)
-            yield node
+            yield result[i:i+6]
 
 
     def get_version(self,*args):

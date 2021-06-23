@@ -337,18 +337,22 @@ class ServiceSet():
         cmd = 'systemctl status drbd'
         data = utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
-        result = re.findall('/lib/systemd/system/drbd.service; disabled; vendor preset: enabled',data)
+        result = re.findall('/systemd/system/drbd.service; disabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'disable'
+        else:
+            return 'enable'
 
 
     def check_linstor_controller(self):
         cmd = 'systemctl status linstor-controller'
         data = utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
-        result = re.findall('/lib/systemd/system/linstor-controller.service; disabled; vendor preset: enabled',data)
+        result = re.findall('/systemd/system/linstor-controller.service; disabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'disable'
+        else:
+            return 'enable'
 
 
     # 没办法验证
@@ -363,27 +367,33 @@ class ServiceSet():
         cmd = 'systemctl status linstor-satellite'
         data = utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
-        result = re.findall('/lib/systemd/system/linstor-satellite.service; enabled; vendor preset: enabled',data)
+        result = re.findall('/systemd/system/linstor-satellite.service; enabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'enable'
+        else:
+            return 'disable'
 
 
     def check_pacemaker(self):
         cmd = 'systemctl status pacemaker'
         data = utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
-        result = re.findall('/lib/systemd/system/pacemaker.service; enabled; vendor preset: enabled',data)
+        result = re.findall('/systemd/system/pacemaker.service; enabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'enable'
+        else:
+            return 'disable'
 
 
     def check_corosync(self):
         cmd = 'systemctl status corosync'
         data = utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
-        result = re.findall('/lib/systemd/system/corosync.service; enabled; vendor preset: enabled',data)
+        result = re.findall('/systemd/system/corosync.service; enabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'enable'
+        else:
+            return 'disable'
 
 
 
