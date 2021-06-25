@@ -14,16 +14,18 @@ monkey.patch_all()
 timeout = gevent.Timeout(60)
 
 
-
-class Scheduler():
+class Connect():
     """
-    多协程调度
+    通过ssh连接节点，生成连接对象的列表
     """
-
-    def __init__(self):
-        self.conf_file = utils.ConfFile()
-        self.cluster = self.conf_file.cluster
-        self.list_ssh = []
+    list_ssh = []
+    def __new__(cls, *args, **kwargs):
+        if not hasattr(cls, '_instance'):
+            Connect._instance = super().__new__(cls)
+            Connect._instance.conf_file = utils.ConfFile()
+            Connect._instance.cluster = Connect._instance.conf_file.cluster
+            Connect.get_ssh_conn(Connect._instance)
+        return Connect._instance
 
     def get_ssh_conn(self):
         ssh = SSHAuthorizeNoMGN()
@@ -34,64 +36,61 @@ class Scheduler():
             else:
                 self.list_ssh.append(ssh.make_connect(node['public_ip'],node['port'],'root',node['root_password']))
 
-        return self.list_ssh
 
+class PacemakerConsole():
+    def __init__(self):
+        self.conn = Connect()
 
     def modify_hostname(self):
         lst = []
         hosts_file = []
-
-        for node in self.cluster['node']:
+        for node in self.conn.cluster['node']:
             hosts_file.append({'ip': node['public_ip'], 'hostname': node['hostname']})
 
-        for ssh,node in zip(self.list_ssh,self.cluster['node']):
+        for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             executor = action.Host(ssh)
-            lst.append(gevent.spawn(executor.modify_hostname,node['hostname']))
-            lst.append(gevent.spawn(executor.modify_hostsfile,'127.0.1.1',node['hostname']))
+            lst.append(gevent.spawn(executor.modify_hostname, node['hostname']))
+            lst.append(gevent.spawn(executor.modify_hostsfile, '127.0.1.1', node['hostname']))
             for host in hosts_file:
-                lst.append(gevent.spawn(executor.modify_hostsfile,host['ip'],host['hostname']))
+                lst.append(gevent.spawn(executor.modify_hostsfile, host['ip'], host['hostname']))
 
         gevent.joinall(lst)
 
-
     def ssh_conn_build(self):
         ssh = SSHAuthorizeNoMGN()
-        ssh.init_cluster_no_mgn('cluster',self.cluster['node'],self.list_ssh)
+        ssh.init_cluster_no_mgn('cluster', self.conn.cluster['node'], self.conn.list_ssh)
 
     def check_hostname(self):
         lst = []
-        for ssh,node in zip(self.list_ssh,self.cluster['node']):
-            lst.append(gevent.spawn(action.Host(ssh).check_hostname,node['hostname']))
+        for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
+            lst.append(gevent.spawn(action.Host(ssh).check_hostname, node['hostname']))
         gevent.joinall(lst)
         result = [job.value for job in lst]
         return result
 
-
     def check_ssh_authorized(self):
         lst = []
-        cluster_hosts = [node['hostname'] for node in self.cluster['node']]
-        for ssh in self.list_ssh:
-            lst.append(gevent.spawn(action.Host(ssh).check_ssh,cluster_hosts))
+        cluster_hosts = [node['hostname'] for node in self.conn.cluster['node']]
+        for ssh in self.conn.list_ssh:
+            lst.append(gevent.spawn(action.Host(ssh).check_ssh, cluster_hosts))
         gevent.joinall(lst)
         result = [job.value for job in lst]
         return result
 
     def sync_time(self):
         lst = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             lst.append(gevent.spawn(action.Corosync(ssh).sync_time))
         gevent.joinall(lst)
 
-
-
     def corosync_conf_change(self):
         lst = []
-        cluster_name = self.conf_file.get_cluster_name()
-        bindnetaddr = self.conf_file.get_bindnetaddr()[0]
-        interface = self.conf_file.get_inferface()
-        nodelist = self.conf_file.get_nodelist()
+        cluster_name = self.conn.conf_file.get_cluster_name()
+        bindnetaddr = self.conn.conf_file.get_bindnetaddr()[0]
+        interface = self.conn.conf_file.get_inferface()
+        nodelist = self.conn.conf_file.get_nodelist()
 
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             lst.append(gevent.spawn(action.Corosync(ssh).change_corosync_conf,
                                     cluster_name,
                                     bindnetaddr,
@@ -104,7 +103,7 @@ class Scheduler():
     def restart_corosync(self):
         lst = []
         timeout.start()
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             lst.append(gevent.spawn(action.Corosync(ssh).restart_corosync))
         try:
             gevent.joinall(lst)
@@ -116,10 +115,10 @@ class Scheduler():
 
 
     def check_corosync(self):
-        nodes = [node['hostname'] for node in self.cluster['node']]
+        nodes = [node['hostname'] for node in self.conn.cluster['node']]
         lst_ring_status = []
         lst_cluster_status = []
-        for ssh,node in zip(self.list_ssh,self.cluster['node']):
+        for ssh,node in zip(self.conn.list_ssh,self.conn.cluster['node']):
             corosync = action.Corosync(ssh)
             lst_ring_status.append(gevent.spawn(corosync.check_ring_status,node))
             lst_cluster_status.append(gevent.spawn(corosync.check_corosync_status,nodes))
@@ -136,8 +135,9 @@ class Scheduler():
         return lst
 
 
+
     def packmaker_conf_change(self):
-        cluster_name = self.conf_file.get_cluster_name()
+        cluster_name = self.conn.conf_file.get_cluster_name()
         packmaker = action.Pacemaker()
 
         lst = []
@@ -147,23 +147,23 @@ class Scheduler():
         lst.append(gevent.spawn(packmaker.modify_stonith_enabled))
 
         gevent.joinall(lst)
-        self.conf_file.cluster['cluster'] = cluster_name
-        self.conf_file.update_yaml()
+        self.conn.conf_file.cluster['cluster'] = cluster_name
+        self.conn.conf_file.update_yaml()
 
 
     def check_packmaker(self):
-        cluster_name = self.cluster['cluster']
+        cluster_name = self.conn.cluster['cluster']
         packmaker = action.Pacemaker()
         if packmaker.check_crm_conf(cluster_name):
-            return [True] * len(self.list_ssh)
+            return [True] * len(self.conn.list_ssh)
         else:
-            return [False] * len(self.list_ssh)
+            return [False] * len(self.conn.list_ssh)
 
 
 
     def targetcli_conf_change(self):
         lst = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             targetcli = action.TargetCLI(ssh)
             lst.append(gevent.spawn(targetcli.set_auto_add_default_portal))
             lst.append(gevent.spawn(targetcli.set_auto_add_mapped_luns))
@@ -174,7 +174,7 @@ class Scheduler():
 
     def check_targetcli(self):
         lst = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             targetcli = action.TargetCLI(ssh)
             lst.append(gevent.spawn(targetcli.check_targetcli_conf))
 
@@ -185,7 +185,7 @@ class Scheduler():
 
     def service_set(self):
         lst = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             executor = action.ServiceSet(ssh)
             lst.append(gevent.spawn(executor.set_disable_drbd))
             lst.append(gevent.spawn(executor.set_disable_linstor_controller))
@@ -200,7 +200,7 @@ class Scheduler():
 
     def check_service(self):
         lst = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             check_result = []
             executor = action.ServiceSet(ssh)
             check_result.append(gevent.spawn(executor.check_drbd))
@@ -219,7 +219,7 @@ class Scheduler():
 
     def replace_ra(self):
         other_node = []
-        for ssh,node in zip(self.list_ssh,self.cluster['node']):
+        for ssh,node in zip(self.conn.list_ssh,self.conn.cluster['node']):
             executor = action.RA(ssh)
             lst = []
             lst.append(gevent.spawn(executor.backup_iscsilogicalunit()))
@@ -238,7 +238,7 @@ class Scheduler():
     def check_ra(self):
         lst = []
 
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             check_result = []
             executor = action.RA(ssh)
             check_result.append(gevent.spawn(executor.check_ra_target))
@@ -255,7 +255,7 @@ class Scheduler():
     def set_ip_on_device(self):
         lst_set = []
 
-        for ssh, node in zip(self.list_ssh, self.cluster['node']):
+        for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             ip_service = action.IpService(ssh)
             lst_set.append(gevent.spawn(ip_service.set_ip, node['private_ip']['device'], node['private_ip']['ip'], node['private_ip']['gateway']))
         gevent.joinall(lst_set)
@@ -265,7 +265,7 @@ class Scheduler():
     def modify_ip_on_device(self):
         lst_modify = []
 
-        for ssh, node in zip(self.list_ssh, self.cluster['node']):
+        for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             ip_service = action.IpService(ssh)
             lst_modify.append(gevent.spawn(ip_service.modify_ip, node['private_ip']['device'], node['private_ip']['ip'], node['private_ip']['gateway']))
         gevent.joinall(lst_modify)
@@ -274,15 +274,38 @@ class Scheduler():
 
     def up_ip_service(self):
         lst_up = []
-        for ssh, node in zip(self.list_ssh, self.cluster['node']):
+        for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             ip_service = action.IpService(ssh)
             lst_up.append(gevent.spawn(ip_service.up_ip_service, node['private_ip']['device']))
         gevent.joinall(lst_up)
 
 
+class LinstorConsole():
+    def __init__(self):
+        self.conn = Connect()
+
+    def create_nodes(self):
+        coroutine_list = []
+        for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
+            linstor = action.Linstor(ssh)
+            coroutine_list.append(gevent.spawn(linstor.create_node,node['hostname'],node['public_ip']))
+        gevent.joinall(coroutine_list)
+
+    def create_pools(self):
+        # 待测试 以及确定thinlv创建时用到的lvm资源的格式。
+        coroutine_list = []
+        for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
+            linstor = action.Linstor(ssh)
+            vol = node['lvm_device'].split("/")
+            if len(vol) == 1:
+                coroutine_list.append(gevent.spawn(linstor.create_lvm_sp,node['hostname'],node['lvm_device']))
+            elif len(vol) == 2:
+                coroutine_list.append(gevent.spawn(linstor.create_lvmthin_sp,node['hostname'],node['lvm_device']))
+        gevent.joinall(coroutine_list)
+
     # HA controller配置
     def build_ha_controller(self):
-        backup_path = self.cluster['backup_path']
+        backup_path = self.conn.cluster['backup_path']
         ha = action.HALinstorController()
         ha.create_rd('linstordb')
         ha.create_vd('linstordb', '250M')
@@ -291,18 +314,18 @@ class Scheduler():
             print('LINSTOR connection refused')
             sys.exit()
 
-        node_list = [node['hostname'] for node in self.cluster['node']]
+        node_list = [node['hostname'] for node in self.conn.cluster['node']]
         if not ha.pool0_is_exist(node_list):
             print('storage-pool：pool0 does not exist')
             sys.exit()
 
         lst_res_create = []
-        for node in self.cluster['node']:
+        for node in self.conn.cluster['node']:
             lst_res_create.append(gevent.spawn(ha.create_res,'linstordb',node['hostname'],'pool0'))
 
         gevent.joinall(lst_res_create)
 
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             ha = action.HALinstorController(ssh)
             if ha.is_active_controller():
                 ha.stop_controller()
@@ -313,7 +336,7 @@ class Scheduler():
 
     def check_ha_controller(self,timeout=30):
         ha = action.HALinstorController()
-        node_list = [node['hostname'] for node in self.cluster['node']]
+        node_list = [node['hostname'] for node in self.conn.cluster['node']]
         t_beginning = time.time()
         while True:
             if ha.check_linstor_controller(node_list):
@@ -323,16 +346,17 @@ class Scheduler():
                 return False
             time.sleep(1)
 
+
     def backup_linstordb(self,timeout=30):
         linstordb_path = 'ls -l /var/lib/linstor'
-        if self.cluster['backup_path'].endswith('/'):
-            backup_path = f"{self.cluster['backup_path']}backup_{time.strftime('%Y%m%d%H%M')}"
+        if self.conn.cluster['backup_path'].endswith('/'):
+            backup_path = f"{self.conn.cluster['backup_path']}backup_{time.strftime('%Y%m%d%H%M')}"
         else:
-            backup_path = f"{self.cluster['backup_path']}/backup_{time.strftime('%Y%m%d%H%M')}"
+            backup_path = f"{self.conn.cluster['backup_path']}/backup_{time.strftime('%Y%m%d%H%M')}"
 
         t_beginning = time.time()
         while True:
-            for ssh in self.list_ssh:
+            for ssh in self.conn.list_ssh:
                 ha = action.HALinstorController(ssh)
                 if ha.is_active_controller():
                     if ha.check_linstor_file(linstordb_path):
@@ -345,14 +369,13 @@ class Scheduler():
             time.sleep(1)
 
 
-
     def destroy_linstordb(self):
         ha = action.HALinstorController()
         if not ha.linstor_is_conn():
             print('LINSTOR connection refused')
             sys.exit()
 
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             ha = action.HALinstorController(ssh)
             list_lv = ha.get_linstordb_lv()
             ha.umount_lv(list_lv)
@@ -361,16 +384,13 @@ class Scheduler():
             ha.remove_lv(list_lv)
 
 
-
-
-class VersaSDSSoft(Scheduler):
-
+class VersaSDSSoftConsole():
     def __init__(self):
-        super().__init__()
+        self.conn = Connect()
 
     def apt_update(self):
         lst = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             handler = action.DRBD(ssh)
             lst.append(gevent.spawn(handler.apt_update))
         gevent.joinall(lst)
@@ -378,7 +398,7 @@ class VersaSDSSoft(Scheduler):
 
     def install_spc(self):
         lst = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             handler = action.DRBD(ssh)
             lst.append(gevent.spawn(handler.install_spc))
         gevent.joinall(lst)
@@ -386,7 +406,7 @@ class VersaSDSSoft(Scheduler):
 
     def install_drbd(self):
         lst = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             handler = action.DRBD(ssh)
             lst.append(gevent.spawn(handler.install_drbd))
         gevent.joinall(lst)
@@ -394,7 +414,7 @@ class VersaSDSSoft(Scheduler):
 
     def install_linstor(self):
         lst = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             handler = action.Linstor(ssh)
             lst.append(gevent.spawn(handler.install))
         gevent.joinall(lst)
@@ -402,7 +422,7 @@ class VersaSDSSoft(Scheduler):
 
     def install_lvm2(self):
         lst = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             handler = action.LVM(ssh)
             lst.append(gevent.spawn(handler.install))
         gevent.joinall(lst)
@@ -410,7 +430,7 @@ class VersaSDSSoft(Scheduler):
 
     def install_pacemaker(self):
         lst = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             handler = action.Pacemaker(ssh)
             lst.append(gevent.spawn(handler.install))
         gevent.joinall(lst)
@@ -418,7 +438,7 @@ class VersaSDSSoft(Scheduler):
 
     def install_targetcli(self):
         lst = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             handler = action.TargetCLI(ssh)
             lst.append(gevent.spawn(handler.install))
         gevent.joinall(lst)
@@ -427,7 +447,7 @@ class VersaSDSSoft(Scheduler):
 
     def get_all_service_status(self):
         lst = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             service = action.ServiceSet(ssh)
             host = action.Host(ssh)
             lst.append(gevent.spawn(host.get_hostname))
@@ -451,7 +471,7 @@ class VersaSDSSoft(Scheduler):
         :return:
         """
         coroutine_list = []
-        for ssh in self.list_ssh:
+        for ssh in self.conn.list_ssh:
             host = action.Host(ssh)
             coroutine_list.append(gevent.spawn(host.get_hostname))
             for soft in args:
@@ -481,7 +501,48 @@ class VersaSDSSoft(Scheduler):
             yield result[i:i+len(args)+1]
 
 
+class LVMConsole():
+    def __init__(self):
+        self.conn = Connect()
 
+    def create_dirver_pool(self):
+        pv_list = []
+        for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
+            lvm = action.LVM(ssh)
+            pv_list.append(gevent.spawn(lvm.pv_create,node['pool_disk']))
+        gevent.joinall(pv_list)
+        pv_list = [job.value for job in pv_list]
+        for r,node in zip(pv_list,self.conn.cluster['node']):
+            if not r:
+                print(f"{node['pool_disk']} is not on {node['hostname']}")
+                sys.exit()
+
+        for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
+            lvm = action.LVM(ssh)
+            vol = node['lvm_device'].split("/")
+            if len(vol) == 1:
+                vg = vol[0]
+                lvm.vg_create(vg,node['pool_disk'])
+            elif len(vol) == 2:
+                vg,lv = vol
+                lvm.vg_create(vg,node['pool_disk'])
+                lvm.thinpool_create(vg,lv)
+
+
+
+class Clean():
+    def __init__(self):
+        self.conn = Connect()
+
+
+    def clean_all(self):
+        for ssh in self.conn.list_ssh:
+            utils.exec_cmd("apt purge -y software-properties-common",ssh)
+            utils.exec_cmd("apt purge -y drbd-utils  drbd-dkms",ssh)
+            utils.exec_cmd("apt purge -y linstor-controller linstor-satellite linstor-client lvm2",ssh)
+            utils.exec_cmd("apt purge -y postfix",ssh)
+            utils.exec_cmd("apt purge -y pacemaker crmsh corosync ntpdate",ssh)
+            utils.exec_cmd("apt purge -y targetcli-fb",ssh)
 
 
 

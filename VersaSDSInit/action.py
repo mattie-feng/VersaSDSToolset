@@ -691,11 +691,31 @@ class Linstor():
     def __init__(self,conn=None):
         self.conn = conn
 
+    def create_conf(self,ips):
+        conf_data = f"[global]\ncontrollers={ips}"# ips逗号分割
+        cmd = f"echo {conf_data} > /etc/linstor/linstor-client.conf"
+        utils.exec_cmd(cmd,self.conn)
+
+    def restart_controller(self):
+        cmd = "systemctl restart linstor-controller"
+        utils.exec_cmd(cmd,self.conn)
+
+
+    def create_node(self,node,ip):
+        cmd = f'linstor node create {node} {ip}  --node-type Combined'
+        utils.exec_cmd(cmd,self.conn)
+
+    def create_lvm_sp(self,node,vg):
+        cmd = f'linstor storage-pool create lvm {node} pool0 {vg}'
+        utils.exec_cmd(cmd,self.conn)
+
+    def create_lvmthin_sp(self,node,lv):
+        cmd = f'linstor storage-pool create lvmthin {node} pool0 {lv}'
+        utils.exec_cmd(cmd,self.conn)
 
     def install(self):
         cmd = 'apt install -y linstor-controller linstor-satellite linstor-client'
         utils.exec_cmd(cmd, self.conn)
-
 
     def get_version(self):
         cmd = 'linstor --version'
@@ -707,9 +727,26 @@ class Linstor():
 
 
 class LVM():
-    def __init__(self,conn):
+    def __init__(self,conn=None):
         self.conn = conn
 
+    def pv_create(self,disk):
+        cmd = f'pvcreate {disk}'
+        result = utils.exec_cmd(cmd, self.conn)
+        if 'successfully created' in result:
+            return True
+
+    def vg_create(self,vg,pv):
+        cmd = f'vgcreate {vg} {pv} -y'
+        utils.exec_cmd(cmd, self.conn)
+
+    def thinpool_create(self,vg,lv):
+        create_cmd = f'lvcreate -T -l 90%VG -n {lv} {vg} -y'
+        utils.exec_cmd(create_cmd, self.conn)
+        extend_cmd = f'lvextend -l +100%FREE /dev/{vg}/{lv} -y'
+        utils.exec_cmd(extend_cmd, self.conn)
+
     def install(self):
-        cmd ='apt install -y lvm2'
-        utils.exec_cmd(cmd,self.conn)
+        cmd = 'apt install -y lvm2'
+        utils.exec_cmd(cmd, self.conn)
+

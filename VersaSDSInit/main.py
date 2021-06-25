@@ -24,6 +24,12 @@ class VersaSDSTools():
                                  dest='version',
                                  help='Show current version',
                                  action='store_true')
+        # cmd :build
+        parser_build = subp.add_parser("build",help="build all")
+
+        # Binding function
+        parser_build.set_defaults(func=self.build_all)
+
 
         # cmd:parser
         parser_pc = subp.add_parser(
@@ -107,10 +113,9 @@ class VersaSDSTools():
 
 
     def init_pacemaker_cluster(self, args):
-        controller = control.Scheduler()
-        print('*start*')
+        controller = control.PacemakerConsole()
 
-        controller.get_ssh_conn()
+        print('*start*')
         print('start to set private ip')
         controller.set_ip_on_device()
         print('start to modify hostname')
@@ -156,8 +161,7 @@ class VersaSDSTools():
         print('*success*')
 
     def show_pacemaker_cluster(self, args):
-        controller = control.Scheduler()
-        controller.get_ssh_conn()
+        controller = control.PacemakerConsole()
 
         conf = utils.ConfFile()
         l_node = [i['hostname'] for i in conf.cluster['node']]
@@ -177,9 +181,9 @@ class VersaSDSTools():
         table.print_table()
 
     def conf_controller(self, args):
-        controller = control.Scheduler()
-        controller.get_ssh_conn()
+        controller = control.LinstorConsole()
         print('*start*')
+        print("start to build HA controller")
         controller.build_ha_controller()
         print('Finish configuration，checking')
         if not controller.check_ha_controller():
@@ -188,8 +192,7 @@ class VersaSDSTools():
         print('*success*')
 
     def backup_linstor(self, args):
-        controller = control.Scheduler()
-        controller.get_ssh_conn()
+        controller = control.LinstorConsole()
         print('*start*')
         if controller.backup_linstordb():
             print('Success')
@@ -199,8 +202,7 @@ class VersaSDSTools():
         print('*success*')
 
     def install_soft(self,args):
-        sc = control.VersaSDSSoft()
-        sc.get_ssh_conn()
+        sc = control.VersaSDSSoftConsole()
         print('*start*')
         print('添加linbit-drbd库，并更新')
         sc.install_spc()
@@ -218,13 +220,11 @@ class VersaSDSTools():
         print('*success*')
 
     def delete_linstordb(self,args):
-        controller = control.Scheduler()
-        controller.get_ssh_conn()
+        controller = control.LinstorConsole()
         controller.destroy_linstordb()
 
     def show_status(self,args):
-        controller = control.VersaSDSSoft()
-        controller.get_ssh_conn()
+        controller = control.VersaSDSSoftConsole()
 
         iter_service_status = controller.get_all_service_status()
         table_status = utils.Table()
@@ -254,8 +254,7 @@ class VersaSDSTools():
 
 
     def check_version(self,args):
-        controller = control.VersaSDSSoft()
-        controller.get_ssh_conn()
+        controller = control.VersaSDSSoftConsole()
         iter_version = controller.get_version('drbd','linstor','targetcli','pacemaker','corosync')
 
         dict_all = {'node': [], 'drbd': [], 'linstor': [], 'targetcli': [], 'pacemaker': [], 'corosync': []}
@@ -292,6 +291,25 @@ class VersaSDSTools():
                 table_version.header.append(i[0])
                 table_version.add_column(i[0], i[1])
             table_version.print_table()
+
+    # 一键部署
+    def build_all(self,args):
+        controller_lvm = control.LVMConsole()
+        controller_linstor = control.LinstorConsole()
+
+        # self.install_soft(args)
+        print("1. 安装软件完成")
+        # self.init_pacemaker_cluster(args)
+        print("2. 配置pacemaker集群完成")
+        controller_lvm.create_dirver_pool()
+        print('创建PV/VG/LV成功')
+        controller_linstor.create_nodes()
+        print('创建节点成功')
+        controller_linstor.create_pools()
+        print('创建存储池pool0成功')
+        self.conf_controller(args)
+        print("3. HA Controller配置完成")
+
 
 
 def main():
