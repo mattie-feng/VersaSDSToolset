@@ -284,6 +284,17 @@ class LinstorConsole():
     def __init__(self):
         self.conn = Connect()
 
+    def create_conf_file(self):
+        ips = ",".join([node['public_ip'] for node in self.conn.cluster['node']])
+        coroutine_list = []
+        for ssh in self.conn.list_ssh:
+            linstor = action.Linstor(ssh)
+            coroutine_list.append(gevent.spawn(linstor.create_conf(ips)))
+        gevent.joinall(coroutine_list)
+
+        if self.conn.list_ssh:
+            action.Linstor(self.conn.list_ssh[0]).restart_controller()
+
     def create_nodes(self):
         coroutine_list = []
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
@@ -543,6 +554,7 @@ class Clean():
             utils.exec_cmd("apt purge -y postfix",ssh)
             utils.exec_cmd("apt purge -y pacemaker crmsh corosync ntpdate",ssh)
             utils.exec_cmd("apt purge -y targetcli-fb",ssh)
+
 
 
 

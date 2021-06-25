@@ -1,5 +1,5 @@
 backup_path: /backupdir
-cluster: cluster_210625_210625_210625
+cluster: cluster
 node:
 - hostname: vince2
   lvm_device: vg0

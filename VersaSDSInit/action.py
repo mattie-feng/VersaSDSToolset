@@ -693,13 +693,21 @@ class Linstor():
 
     def create_conf(self,ips):
         conf_data = f"[global]\ncontrollers={ips}"# ips逗号分割
-        cmd = f"echo {conf_data} > /etc/linstor/linstor-client.conf"
+        cmd = f'echo "{conf_data}" > /etc/linstor/linstor-client.conf'
         utils.exec_cmd(cmd,self.conn)
 
-    def restart_controller(self):
+    def restart_controller(self,timeout=20):
         cmd = "systemctl restart linstor-controller"
         utils.exec_cmd(cmd,self.conn)
-
+        t_beginning = time.time()
+        while True:
+            time.sleep(1)
+            result = utils.exec_cmd("linstor n l", self.conn)
+            if "Connection refused" not in result:
+                break
+            seconds_passed = time.time() - t_beginning
+            if timeout and seconds_passed > timeout:
+                return False
 
     def create_node(self,node,ip):
         cmd = f'linstor node create {node} {ip}  --node-type Combined'

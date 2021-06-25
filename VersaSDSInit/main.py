@@ -297,9 +297,9 @@ class VersaSDSTools():
         controller_lvm = control.LVMConsole()
         controller_linstor = control.LinstorConsole()
 
-        # self.install_soft(args)
+        self.install_soft(args)
         print("1. 安装软件完成")
-        # self.init_pacemaker_cluster(args)
+        self.init_pacemaker_cluster(args)
         print("2. 配置pacemaker集群完成")
         controller_lvm.create_dirver_pool()
         print('创建PV/VG/LV成功')
