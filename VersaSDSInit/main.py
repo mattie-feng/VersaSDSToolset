@@ -303,6 +303,7 @@ class VersaSDSTools():
         print("2. 配置pacemaker集群完成")
         controller_lvm.create_dirver_pool()
         print('创建PV/VG/LV成功')
+        controller_linstor.create_conf_file()
         controller_linstor.create_nodes()
         print('创建节点成功')
         controller_linstor.create_pools()
