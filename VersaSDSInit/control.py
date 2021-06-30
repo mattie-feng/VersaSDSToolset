@@ -7,6 +7,7 @@ from ssh_authorized import SSHAuthorizeNoMGN
 import utils
 import action
 
+
 # 协程相关的补丁
 monkey.patch_all()
 
@@ -538,22 +539,6 @@ class LVMConsole():
                 vg,lv = vol
                 lvm.vg_create(vg,node['pool_disk'])
                 lvm.thinpool_create(vg,lv)
-
-
-
-class Clean():
-    def __init__(self):
-        self.conn = Connect()
-
-
-    def clean_all(self):
-        for ssh in self.conn.list_ssh:
-            utils.exec_cmd("apt purge -y software-properties-common",ssh)
-            utils.exec_cmd("apt purge -y drbd-utils  drbd-dkms",ssh)
-            utils.exec_cmd("apt purge -y linstor-controller linstor-satellite linstor-client lvm2",ssh)
-            utils.exec_cmd("apt purge -y postfix",ssh)
-            utils.exec_cmd("apt purge -y pacemaker crmsh corosync ntpdate",ssh)
-            utils.exec_cmd("apt purge -y targetcli-fb",ssh)
 
 
 

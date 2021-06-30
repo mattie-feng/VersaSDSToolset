@@ -2,6 +2,7 @@ import time
 import utils
 import re
 
+
 corosync_conf_path = '/etc/corosync/corosync.conf'
 read_data = './corosync.conf'
 crm_lincontrl_config = './crm_lincontrl_config'
@@ -29,7 +30,6 @@ class IpService(object):
 
     def get_networkcard_data(self):
         cmd_result = utils.exec_cmd('ip a',self.conn)
-
 
 
 class Host():
@@ -88,7 +88,6 @@ class Host():
         sys_version = re.findall('Description:\s*(.*)',result)
         if sys_version:
             return sys_version[0]
-
 
 
 class Corosync():
@@ -235,12 +234,9 @@ class Pacemaker():
             return version[0]
 
 
-
 class TargetCLI():
     def __init__(self,conn=None):
         self.conn = conn
-
-
 
     def set_auto_add_default_portal(self):
         cmd = "targetcli set global auto_add_default_portal=false"
@@ -290,7 +286,6 @@ class TargetCLI():
         version = re.findall('version\s*(.*)',result)
         if version:
             return version[0]
-
 
 
 class ServiceSet():
@@ -396,9 +391,7 @@ class ServiceSet():
             return 'disable'
 
 
-
 class RA():
-
     def __init__(self,conn=None):
         self.conn = conn
         self.ra_path = self._get_ra_path()
@@ -406,12 +399,10 @@ class RA():
         self.ra_target = 'iSCSITarget.mod_cache_gena_acl_0'
         self.ra_logicalunit = 'iSCSILogicalUnit.450_patch1476_mod'
 
-
     def backup_iscsilogicalunit(self):
         cmd = f'mv {self.heartbeat_path}/iSCSILogicalUnit {self.heartbeat_path}/iSCSILogicalUnit.bak'
         if bool(utils.exec_cmd(f'[ -f {self.heartbeat_path}/iSCSILogicalUnit ] && echo True',self.conn)):
             utils.exec_cmd(cmd,self.conn)
-
 
     def backup_iscsitarget(self):
         cmd = f'mv {self.heartbeat_path}/iSCSITarget {self.heartbeat_path}/iSCSITarget.bak'
@@ -430,12 +421,9 @@ class RA():
                 and bool(utils.exec_cmd(f'[ -f {self.heartbeat_path}/{self.ra_logicalunit} ] && echo True')):
             utils.exec_cmd(cmd)
 
-
     def scp_ra(self,hostname):
         cmd = f'scp {self.heartbeat_path}/iSCSITarget {self.heartbeat_path}/iSCSILogicalUnit {hostname}:{self.heartbeat_path}/'
         utils.exec_cmd(cmd,self.conn)
-
-
 
     def check_ra_logicalunit(self):
         cmd = f'grep -rs "#{self.ra_logicalunit}" {self.heartbeat_path}/iSCSILogicalUnit'
@@ -443,13 +431,11 @@ class RA():
         if result:
             return True
 
-
     def check_ra_target(self):
         cmd = f'grep -rs "#{self.ra_target}" {self.heartbeat_path}/iSCSITarget'
         result = utils.exec_cmd(cmd,self.conn)
         if result:
             return True
-
 
     def _get_ra_path(self):
         # list_path_now = sys.path[0].split('/')
@@ -460,7 +446,6 @@ class RA():
         ra_path = '../RA'
 
         return ra_path
-
 
 
 class HALinstorController():
@@ -656,11 +641,9 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         utils.exec_cmd(cmd,self.conn)
 
 
-
 class DRBD():
     def __init__(self,conn=None):
         self.conn = conn
-
 
     def install_spc(self):
         cmd1 = 'apt install -y software-properties-common'
@@ -676,7 +659,6 @@ class DRBD():
         cmd = 'export DEBIAN_FRONTEND=noninteractive && apt install -y drbd-utils drbd-dkms'
         utils.exec_cmd(cmd, self.conn)
 
-
     def get_version(self):
         cmd = 'drbdadm --version'
         result = utils.exec_cmd(cmd,self.conn)
@@ -684,7 +666,6 @@ class DRBD():
         # version_drbdadm = re.findall('')
         if version_kernel:
             return version_kernel[0]
-
 
 
 class Linstor():
@@ -731,7 +712,6 @@ class Linstor():
         version = re.findall('linstor (.*);',result)
         if version:
             return version[0]
-
 
 
 class LVM():
