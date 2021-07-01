@@ -1,7 +1,9 @@
-cluster: cluster
 backup_path: /backupdir
+cluster: cluster_210630_210630
 node:
 - hostname: vince2
+  lvm_device: vg0
+  pool_disk: /dev/sdb
   port: 22
   private_ip:
     device: ens192
@@ -10,6 +12,8 @@ node:
   public_ip: 10.203.1.157
   root_password: password
 - hostname: vince3
+  lvm_device: vg0
+  pool_disk: /dev/sdb
   port: 22
   private_ip:
     device: ens192
@@ -17,5 +21,3 @@ node:
     ip: 10.203.2.187
   public_ip: 10.203.1.195
   root_password: password
-
-

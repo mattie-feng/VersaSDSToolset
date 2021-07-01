@@ -2,6 +2,7 @@ import time
 import utils
 import re
 
+
 corosync_conf_path = '/etc/corosync/corosync.conf'
 read_data = './corosync.conf'
 crm_lincontrl_config = './crm_lincontrl_config'
@@ -29,7 +30,6 @@ class IpService(object):
 
     def get_networkcard_data(self):
         cmd_result = utils.exec_cmd('ip a',self.conn)
-
 
 
 class Host():
@@ -88,7 +88,6 @@ class Host():
         sys_version = re.findall('Description:\s*(.*)',result)
         if sys_version:
             return sys_version[0]
-
 
 
 class Corosync():
@@ -235,12 +234,9 @@ class Pacemaker():
             return version[0]
 
 
-
 class TargetCLI():
     def __init__(self,conn=None):
         self.conn = conn
-
-
 
     def set_auto_add_default_portal(self):
         cmd = "targetcli set global auto_add_default_portal=false"
@@ -292,7 +288,6 @@ class TargetCLI():
             return version[0]
 
 
-
 class ServiceSet():
     def __init__(self,conn=None):
         self.conn = conn
@@ -337,18 +332,22 @@ class ServiceSet():
         cmd = 'systemctl status drbd'
         data = utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
-        result = re.findall('/lib/systemd/system/drbd.service; disabled; vendor preset: enabled',data)
+        result = re.findall('/systemd/system/drbd.service; disabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'disable'
+        else:
+            return 'enable'
 
 
     def check_linstor_controller(self):
         cmd = 'systemctl status linstor-controller'
         data = utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
-        result = re.findall('/lib/systemd/system/linstor-controller.service; disabled; vendor preset: enabled',data)
+        result = re.findall('/systemd/system/linstor-controller.service; disabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'disable'
+        else:
+            return 'enable'
 
 
     # 没办法验证
@@ -363,32 +362,36 @@ class ServiceSet():
         cmd = 'systemctl status linstor-satellite'
         data = utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
-        result = re.findall('/lib/systemd/system/linstor-satellite.service; enabled; vendor preset: enabled',data)
+        result = re.findall('/systemd/system/linstor-satellite.service; enabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'enable'
+        else:
+            return 'disable'
 
 
     def check_pacemaker(self):
         cmd = 'systemctl status pacemaker'
         data = utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
-        result = re.findall('/lib/systemd/system/pacemaker.service; enabled; vendor preset: enabled',data)
+        result = re.findall('/systemd/system/pacemaker.service; enabled; vendor preset: enabled',data)
         if result:
-            return True
+            return 'enable'
+        else:
+            return 'disable'
 
 
     def check_corosync(self):
         cmd = 'systemctl status corosync'
         data = utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
-        result = re.findall('/lib/systemd/system/corosync.service; enabled; vendor preset: enabled',data)
+        result = re.findall('/systemd/system/corosync.service; enabled; vendor preset: enabled',data)
         if result:
-            return True
-
+            return 'enable'
+        else:
+            return 'disable'
 
 
 class RA():
-
     def __init__(self,conn=None):
         self.conn = conn
         self.ra_path = self._get_ra_path()
@@ -396,12 +399,10 @@ class RA():
         self.ra_target = 'iSCSITarget.mod_cache_gena_acl_0'
         self.ra_logicalunit = 'iSCSILogicalUnit.450_patch1476_mod'
 
-
     def backup_iscsilogicalunit(self):
         cmd = f'mv {self.heartbeat_path}/iSCSILogicalUnit {self.heartbeat_path}/iSCSILogicalUnit.bak'
         if bool(utils.exec_cmd(f'[ -f {self.heartbeat_path}/iSCSILogicalUnit ] && echo True',self.conn)):
             utils.exec_cmd(cmd,self.conn)
-
 
     def backup_iscsitarget(self):
         cmd = f'mv {self.heartbeat_path}/iSCSITarget {self.heartbeat_path}/iSCSITarget.bak'
@@ -420,12 +421,9 @@ class RA():
                 and bool(utils.exec_cmd(f'[ -f {self.heartbeat_path}/{self.ra_logicalunit} ] && echo True')):
             utils.exec_cmd(cmd)
 
-
     def scp_ra(self,hostname):
         cmd = f'scp {self.heartbeat_path}/iSCSITarget {self.heartbeat_path}/iSCSILogicalUnit {hostname}:{self.heartbeat_path}/'
         utils.exec_cmd(cmd,self.conn)
-
-
 
     def check_ra_logicalunit(self):
         cmd = f'grep -rs "#{self.ra_logicalunit}" {self.heartbeat_path}/iSCSILogicalUnit'
@@ -433,13 +431,11 @@ class RA():
         if result:
             return True
 
-
     def check_ra_target(self):
         cmd = f'grep -rs "#{self.ra_target}" {self.heartbeat_path}/iSCSITarget'
         result = utils.exec_cmd(cmd,self.conn)
         if result:
             return True
-
 
     def _get_ra_path(self):
         # list_path_now = sys.path[0].split('/')
@@ -450,7 +446,6 @@ class RA():
         ra_path = '../RA'
 
         return ra_path
-
 
 
 class HALinstorController():
@@ -646,11 +641,9 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         utils.exec_cmd(cmd,self.conn)
 
 
-
 class DRBD():
     def __init__(self,conn=None):
         self.conn = conn
-
 
     def install_spc(self):
         cmd1 = 'apt install -y software-properties-common'
@@ -666,7 +659,6 @@ class DRBD():
         cmd = 'export DEBIAN_FRONTEND=noninteractive && apt install -y drbd-utils drbd-dkms'
         utils.exec_cmd(cmd, self.conn)
 
-
     def get_version(self):
         cmd = 'drbdadm --version'
         result = utils.exec_cmd(cmd,self.conn)
@@ -676,16 +668,43 @@ class DRBD():
             return version_kernel[0]
 
 
-
 class Linstor():
     def __init__(self,conn=None):
         self.conn = conn
 
+    def create_conf(self,ips):
+        conf_data = f"[global]\ncontrollers={ips}"# ips逗号分割
+        cmd = f'echo "{conf_data}" > /etc/linstor/linstor-client.conf'
+        utils.exec_cmd(cmd,self.conn)
+
+    def restart_controller(self,timeout=20):
+        cmd = "systemctl restart linstor-controller"
+        utils.exec_cmd(cmd,self.conn)
+        t_beginning = time.time()
+        while True:
+            time.sleep(1)
+            result = utils.exec_cmd("linstor n l", self.conn)
+            if "Connection refused" not in result:
+                break
+            seconds_passed = time.time() - t_beginning
+            if timeout and seconds_passed > timeout:
+                return False
+
+    def create_node(self,node,ip):
+        cmd = f'linstor node create {node} {ip}  --node-type Combined'
+        utils.exec_cmd(cmd,self.conn)
+
+    def create_lvm_sp(self,node,vg):
+        cmd = f'linstor storage-pool create lvm {node} pool0 {vg}'
+        utils.exec_cmd(cmd,self.conn)
+
+    def create_lvmthin_sp(self,node,lv):
+        cmd = f'linstor storage-pool create lvmthin {node} pool0 {lv}'
+        utils.exec_cmd(cmd,self.conn)
 
     def install(self):
         cmd = 'apt install -y linstor-controller linstor-satellite linstor-client'
         utils.exec_cmd(cmd, self.conn)
-
 
     def get_version(self):
         cmd = 'linstor --version'
@@ -695,11 +714,27 @@ class Linstor():
             return version[0]
 
 
-
 class LVM():
-    def __init__(self,conn):
+    def __init__(self,conn=None):
         self.conn = conn
 
+    def pv_create(self,disk):
+        cmd = f'pvcreate {disk}'
+        result = utils.exec_cmd(cmd, self.conn)
+        if 'successfully created' in result:
+            return True
+
+    def vg_create(self,vg,pv):
+        cmd = f'vgcreate {vg} {pv} -y'
+        utils.exec_cmd(cmd, self.conn)
+
+    def thinpool_create(self,vg,lv):
+        create_cmd = f'lvcreate -T -l 90%VG -n {lv} {vg} -y'
+        utils.exec_cmd(create_cmd, self.conn)
+        extend_cmd = f'lvextend -l +100%FREE /dev/{vg}/{lv} -y'
+        utils.exec_cmd(extend_cmd, self.conn)
+
     def install(self):
-        cmd ='apt install -y lvm2'
-        utils.exec_cmd(cmd,self.conn)
+        cmd = 'apt install -y lvm2'
+        utils.exec_cmd(cmd, self.conn)
+
