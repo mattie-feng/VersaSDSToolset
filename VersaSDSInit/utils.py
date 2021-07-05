@@ -6,6 +6,7 @@ import subprocess
 import time
 import json
 import prettytable
+import logging
 import pexpect
 import re
 import sys
@@ -52,7 +53,7 @@ class SSHConn(object):
             err = stderr.read()
             if len(err) > 0:
                 # 记录一下log
-                pass
+                return err
             #     print('''Excute command "{}" failed on "{}" with error:
             # "{}"'''.format(command, self._host, err.strip()))
 
@@ -211,6 +212,8 @@ class Table():
     def add_data(self,list_data):
         self.table.add_row(list_data)
 
+    def add_column(self,fieldname,list_column):
+        self.table.add_column(fieldname,list_column)
 
     def print_table(self):
         self.table.field_names = self.header
@@ -251,49 +254,31 @@ def exec_cmd(cmd,conn=None):
     else:
         result = subprocess.getoutput(cmd)
     result = result.decode() if isinstance(result,bytes) else result
+    log_data = f'{conn._host if conn else "localhost"} - {result}'
+    Log().logger.info(log_data)
     if result:
         result = result.rstrip('\n')
     return result
 
 
 
-# def exec_cmd_second(cmd, timeout=10):
-#     """
-#     Execute the command cmd to return the content of the command output.
-#     If it times out, a TimeoutError exception will be thrown.
-#     cmd - Command to be executed
-#     timeout - The longest waiting time(unit:second)
-#     """
-#     p = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE, stdin=subprocess.PIPE, shell=True)
-#     t_beginning = time.time()
-#     seconds_passed = 0
-#     output = None
-#
-#     while True:
-#         if p.poll() is not None:
-#             break
-#         if p.stderr:
-#             p.stderr
-#             break
-#
-#
-#         seconds_passed = time.time() - t_beginning
-#         if timeout and seconds_passed > timeout:
-#             p.terminate()
-#             raise TimeoutError(cmd, timeout)
-#         time.sleep(0.1)
-#     out, err = p.communicate()
-#     if len(out) > 0:
-#         out = out.decode()
-#         output = {'sts': 1, 'rst': out}
-#     elif len(err) > 0:
-#         err = err.decode()
-#         output = {'sts': 0, 'rst': err}
-#     elif out == b'':  # 需要再考虑一下 res stop 执行成功没有返回，stop失败也没有返回（无法判断stop成不成功）
-#         out = out.decode()
-#         output = {'sts': 1, 'rst': out}
-#
-#     if output:
-#         return output
-#     else:
-#         s.handle_exception()
+class Log():
+    def __init__(self):
+        pass
+
+    def __new__(cls, *args, **kwargs):
+        if not hasattr(cls, '_instance'):
+            Log._instance = super().__new__(cls)
+            Log._instance.logger = logging.getLogger()
+            Log._instance.logger.setLevel(logging.INFO)
+            Log.set_handler(Log._instance.logger)
+        return Log._instance
+
+    @staticmethod
+    def set_handler(logger):
+        fh = logging.FileHandler('./VersaSDSLog.log', mode='a')
+        fh.setLevel(logging.DEBUG)  # 输出到file的log等级的开关
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+
