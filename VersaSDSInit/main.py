@@ -148,10 +148,16 @@ class VersaSDSTools():
             print('start to set up service')
             controller.service_set()
         else:
-            print('service configuration failed')
-            sys.exit()
+            print("try again")
+            controller.targetcli_conf_change()
+            if all(controller.check_targetcli()):
+                print('start to set up service')
+                controller.service_set()
+            else:
+                print('service configuration failed')
+                sys.exit()
 
-        if all(controller.check_targetcli()):
+        if all(controller.check_service()):
             print('start to replace RA')
             controller.replace_ra()
         else:
