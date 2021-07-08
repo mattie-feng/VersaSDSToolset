@@ -1,0 +1,12 @@
+node:
+  - hostname: mattie1
+    type: balance-rr
+    device:
+      - ens192
+      - ens224
+
+  - hostname: mattie2
+    type: balance-rr
+    device:
+      - ens192
+      - ens224
