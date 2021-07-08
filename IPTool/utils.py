@@ -4,6 +4,8 @@ import socket
 import os
 import subprocess
 import yaml
+import sys
+import re
 
 
 def exec_cmd(cmd, conn=None):
@@ -22,6 +24,15 @@ def exec_cmd(cmd, conn=None):
             return {"st": False, "rt": p.stderr}
 
 
+def check_mode(mode):
+    mode_list = ["balance-rr", "active-backup", "broadcast", "802.3ad", "balance-tlb", "balance-alb"]
+    if mode in mode_list:
+        return True
+    else:
+        print(f"{mode} is not in following mode: {', '.join(mode_list)}")
+        return False
+
+
 def check_ip(ip):
     """检查IP格式"""
     re_ip = re.compile(
@@ -29,6 +40,9 @@ def check_ip(ip):
     result = re_ip.match(ip)
     if result:
         return True
+    else:
+        print(f"ERROR in IP format of {ip}, please check.")
+        return False
 
 
 class SSHConn(object):
@@ -54,13 +68,15 @@ class SSHConn(object):
             # objSSHClient.exec_command("\x003")
             self.SSHConnection = objSSHClient
         except:
-            print(f"Failed to connect {self._host}")
+            print(f" Failed to connect {self._host}")
 
     def ssh_connect(self):
         self._connect()
         if not self.SSHConnection:
             print(f'Connect retry for {self._host}')
             self._connect()
+            if not self.SSHConnection:
+                sys.exit()
 
     def exec_cmd(self, command):
         if self.SSHConnection:
@@ -109,6 +125,12 @@ class ConfFile():
     def get_config(self):
         lst = []
         for host_config in self.config["node"]:
-            lst.append([host_config['hostname'], host_config['type']])
-            print(lst)
+            if check_mode(host_config['mode']) and check_ip(host_config['ip']):
+                lst.append(
+                    [host_config['hostname'], host_config['bond'], host_config['mode'], host_config['device'],
+                     host_config['ip']])
+            else:
+                print(f"Please check the config of {host_config['hostname']}")
+                sys.exit()
+        print(lst)
         return lst
