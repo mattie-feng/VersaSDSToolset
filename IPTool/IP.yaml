@@ -2,7 +2,7 @@ node:
   - hostname: mattie1
     bond: bond0
     mode: balance-rr
-    ip: 10.203.1.237
+    ip: 10.203.2.237
     device:
       - ens192
       - ens224
@@ -10,7 +10,7 @@ node:
   - hostname: mattie2
     bond: bond0
     mode: balance-rr
-    ip: 10.203.1.213
+    ip: 10.203.2.213
     device:
       - ens192
       - ens224

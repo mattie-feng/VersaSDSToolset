@@ -113,9 +113,11 @@ class ConfFile():
                 yaml_dict = yaml.safe_load(f)
             return yaml_dict
         except FileNotFoundError:
-            print("Please check the file name:", self.yaml_file)
+            print(f"Please check the file name: {self.yaml_file}")
+            sys.exit()
         except TypeError:
             print("Error in the type of file name.")
+            sys.exit()
 
     def update_yaml(self):
         """更新文件内容"""
@@ -132,5 +134,4 @@ class ConfFile():
             else:
                 print(f"Please check the config of {host_config['hostname']}")
                 sys.exit()
-        print(lst)
         return lst

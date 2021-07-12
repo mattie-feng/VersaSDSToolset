@@ -1,11 +1,10 @@
 import time
 import utils
-import re
 
 
 class IpService(object):
     def __init__(self, node):
-        if node == utils.get_hostname() or node == None:
+        if node == utils.get_hostname() or node is None:
             self.conn = None
         else:
             self.conn = utils.SSHConn(node)
@@ -49,7 +48,8 @@ class IpService(object):
         return False
 
     def add_bond_slave(self, master, device):
-        bond_slave = f'{master}-slave-{device}'
+        """add device into the bond connection which has been set"""
+        bond_slave = f'vtel_{master}-slave-{device}'
         cmd = f"nmcli connection add con-name {bond_slave} type bond-slave ifname {device} master {master}"
         result = utils.exec_cmd(cmd, self.conn)
         if result:
@@ -57,6 +57,9 @@ class IpService(object):
                 return bond_slave
 
     def modify_bonding_mode(self, device, mode):
+        """
+        Note: result of execute command is None, but actually the command has been executed
+        """
         connection_name = f'vtel_{device}'
         cmd = f"nmcli connection modify {connection_name} mode {mode}"
         result = utils.exec_cmd(cmd, self.conn)
@@ -74,7 +77,6 @@ class IpService(object):
         return False
 
     def del_connect(self, connection_name):
-        # bond-slave-ens192
         cmd = f"nmcli connection delete {connection_name}"
         result = utils.exec_cmd(cmd, self.conn)
         if result:
@@ -83,6 +85,7 @@ class IpService(object):
         return False
 
     def get_connection(self):
+        """get all the connection,return a string"""
         cmd = f"nmcli connection show"
         result = utils.exec_cmd(cmd, self.conn)
         if result:
@@ -94,5 +97,5 @@ class IpService(object):
         result = utils.exec_cmd(cmd, self.conn)
         if result:
             if result["st"]:
-                #Bonding Mode: fault-tolerance (broadcast)
+                # Bonding Mode: xxx
                 print(result["rt"])
