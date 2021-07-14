@@ -254,11 +254,23 @@ def exec_cmd(cmd,conn=None):
     else:
         result = subprocess.getoutput(cmd)
     result = result.decode() if isinstance(result,bytes) else result
-    log_data = f'{conn._host if conn else "localhost"} - {result}'
+    log_data = f'{conn._host if conn else "localhost"} - {cmd} - {result}'
     Log().logger.info(log_data)
     if result:
         result = result.rstrip('\n')
     return result
+
+
+def run_timeout(flag,run,timeout=30):
+    t_beginning = time.time()
+    while True:
+        run()
+        if flag:
+           break
+        time.sleep(1)
+        seconds_passed = time.time() - t_beginning
+        if timeout and seconds_passed > timeout:
+            raise TimeoutError()
 
 
 

@@ -1,6 +1,7 @@
 import argparse
 import sys
 import os
+import time
 
 sys.path.append('../')
 import control
@@ -139,19 +140,35 @@ class VersaSDSTools():
 
         if all(controller.check_packmaker()):
             print('start to set up targetcli')
-            controller.targetcli_conf_change()
         else:
             print('pacemaker configuration failed')
             sys.exit()
+
+        # conf and check targecli
+        t_beginning = time.time()
+        timeout=30
+        while True:
+            controller.targetcli_conf_change()
+            if all(controller.check_targetcli()):
+                break
+            seconds_passed = time.time() - t_beginning
+            if timeout and seconds_passed > timeout:
+                raise TimeoutError("Failed to set targetcli configuration parameters")
 
         if all(controller.check_targetcli()):
             print('start to set up service')
             controller.service_set()
         else:
-            print('service configuration failed')
-            sys.exit()
+            print("try again")
+            controller.targetcli_conf_change()
+            if all(controller.check_targetcli()):
+                print('start to set up service')
+                controller.service_set()
+            else:
+                print('service configuration failed')
+                sys.exit()
 
-        if all(controller.check_targetcli()):
+        if all(controller.check_service()):
             print('start to replace RA')
             controller.replace_ra()
         else:
@@ -328,10 +345,5 @@ def main():
 
 
 if __name__  == '__main__':
-    # sc = control.VersaSDSSoft()
-    # sc.get_ssh_conn()
-    # # # sc.build_ha_controller()
-    # # # sc.backup_linstordb()
-    # # sc.destroy_linstordb()
     main()
 
