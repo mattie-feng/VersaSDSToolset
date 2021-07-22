@@ -187,31 +187,6 @@ class PacemakerConsole():
         return result
 
 
-
-
-    def monitor_status_by_time(self,res, type, expect_status, timeout=20):
-        """
-        检查crm res的状态
-        :param res: 需要检查的资源
-        :param type_res: 需要检查的资源类型
-        :param timeout: 监控时间限制
-        :param expect_status: 预期状态
-        :return: 返回True则说明是预期效果
-        """
-        t_beginning = time.time()
-        while True:
-            if expect_status in self.get_crm_res_status(res, type):
-                s.prt_log(f'The status of {res} is {expect_status} now.', 0)
-                return True
-            else:
-                time.sleep(1)
-
-            seconds_passed = time.time() - t_beginning
-            if timeout and seconds_passed > timeout:
-                raise TimeoutError(res)
-
-
-
     def service_set(self):
         lst = []
         for ssh in self.conn.list_ssh:
