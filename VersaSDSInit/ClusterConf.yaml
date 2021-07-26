@@ -12,13 +12,13 @@ node:
   public_ip: 10.203.1.157
   root_password: password
 
-- hostname: vince3
+- hostname: vince1
   lvm_device: vg0
   pool_disk: /dev/sdb
   port: 22
   private_ip:
     device: ens192
     gateway: 10.203.2.1
-    ip: 10.203.2.187
-  public_ip: 10.203.1.195
+    ip: 10.203.2.155
+  public_ip: 10.203.1.155
   root_password: password
