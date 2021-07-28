@@ -51,9 +51,9 @@ class VersaSDSTools():
 
 
 def main():
-    # if os.geteuid() != 0:
-    #     print('This program must be run as root. Aborting.')
-    #     sys.exit()
+    if os.geteuid() != 0:
+        print('This program must be run as root. Aborting.')
+        sys.exit()
     try:
         cmd = VersaSDSTools()
         cmd.parse()
