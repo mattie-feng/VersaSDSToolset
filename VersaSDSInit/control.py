@@ -48,6 +48,9 @@ class PacemakerConsole():
         for node in self.conn.cluster['node']:
             hosts_file.append({'ip': node['public_ip'], 'hostname': node['hostname']})
 
+        print(hosts_file)
+
+
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             executor = action.Host(ssh)
             lst.append(gevent.spawn(executor.modify_hostname, node['hostname']))
