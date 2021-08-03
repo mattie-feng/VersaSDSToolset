@@ -50,6 +50,9 @@ def set_local_ip(conf_args):
     """连接IP的设置的功能"""
     ip_service = action.IpService(conf_args["User password"])
     print(f"Start to set {conf_args['IP']} on the {conf_args['Device']}")
+    ssh_service = action.OpenSSHService(conf_args["User password"])
     if ip_service.set_local_ip(conf_args['Device'], conf_args['IP'], conf_args['Gateway']):
         ip_service.up_local_ip_service(conf_args['Device'])
+        print(" Start to restart openssh service")
+        ssh_service.oprt_ssh_service("restart")
         print(f"Finish to set {conf_args['IP']} on the {conf_args['Device']}")

@@ -56,7 +56,7 @@ class InputParser(object):
                                        help='Password of root that you want to set',
                                        action='store')
 
-        self.parser_ip = subp.add_parser("ip", help="Connection IP settings")
+        self.parser_ip = subp.add_parser("ip", help="Connection IP settings (based on network-manager)")
 
         self.parser_ip.add_argument('-ip',
                                     '--ip',
