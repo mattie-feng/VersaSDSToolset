@@ -46,9 +46,9 @@ class Bonding():
                 for slave in slave_list:
                     bonding.down_connect(slave)
                     if bonding.del_connect(slave):
-                        print(f"Success in deleting {slave}")
+                        print(f" Success in deleting {slave}")
                     else:
-                        print(f"Failed to delete {slave}")
+                        print(f" Failed to delete {slave}")
             if self.check_bonding_exist(bonding_name, connection):
                 bonding.down_connect(bonding_name)
                 print("Started to delete bonding")
