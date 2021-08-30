@@ -23,8 +23,6 @@ class Bonding():
         bonding = action.IpService(node)
         connection = bonding.get_connection()
         lc_mode = bonding.get_mode(bonding_name)
-
-        cmd = "nmcli connection show"
         if self.check_bonding_exist(f'vtel_{bonding_name}', connection):
             print(f"{bonding_name} already exists.")
             lc_hostname = bonding.get_hostname()
