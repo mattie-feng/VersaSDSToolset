@@ -55,22 +55,21 @@ class KSConsole():
     def __init__(self):
         self.conn = Connect()
 
-    def install_HAproxy(self):
+    def install_haproxy(self):
         lst = []
         for ssh in self.conn.list_master_ssh:
             handler = action.HAproxy(ssh)
             lst.append(gevent.spawn(handler.install))
         gevent.joinall(lst)
 
-    def install_Keeplived(self):
+    def install_keeplived(self):
         lst = []
         for ssh in self.conn.list_master_ssh:
             handler = action.Keeplived(ssh)
             lst.append(gevent.spawn(handler.install))
         gevent.joinall(lst)
 
-
-    def modify_hx(self):
+    def modify_haproxy(self):
         lst = []
         if not os.path.exists("./haproxy.cfg"):
             print("haproxy.cfg 文件不存在，退出")
@@ -86,9 +85,55 @@ class KSConsole():
             lst.append(gevent.spawn(handler.modify_cfg,"/etc/haproxy/haproxy.cfg",data))
         gevent.joinall(lst)
 
-    def restart_hx(self):
+    def modify_keeplived(self):
+        lst = []
+        if not os.path.exists("./keeplived.conf"):
+            print("keeplived.conf 文件不存在，退出")
+            sys.exit()
+
+        router_id = self.conn.data['Keeplived']['router_id']
+        virtual_router_id = self.conn.data['Keeplived']['virtual_router_id']
+        virtual_ipaddress = self.conn.data['Keeplived']['virtual_ipaddress']
+
+        for ssh,master in zip(self.conn.list_master_ssh,self.conn.conf_file.master_list):
+            unicast_peer_list = []
+            interface = ""
+            priority = ""
+            unicast_src_ip = ""
+            handler = action.Keeplived(ssh)
+            for host in self.conn.data['Keeplived']['host']:
+                if master == host['name']:
+                    unicast_src_ip = self.conn.conf_file.get_ip(host['name'])
+                    interface = host['interface']
+                    priority = host['priority']
+                else:
+                    unicast_peer_list.append(self.conn.conf_file.get_ip(host['name']))
+
+            if not all([interface,priority,unicast_src_ip]):
+                print("配置文件master节点的数据不一致")
+                sys.exit()
+
+            lst.append(gevent.spawn(handler.modify_conf,
+                                    "./keeplived_test.conf",
+                                    router_id,
+                                    interface,
+                                    virtual_router_id,
+                                    priority,
+                                    unicast_src_ip,
+                                    unicast_peer_list,
+                                    virtual_ipaddress
+                                    ))
+        gevent.joinall(lst)
+
+
+
+    def restart_haproxy(self):
         lst = []
         for ssh in self.conn.list_master_ssh:
             handler = action.HAproxy(ssh)
             lst.append(gevent.spawn(handler.restart))
         gevent.joinall(lst)
+
+
+
+KSConsole().modify_keeplived()

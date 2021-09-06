@@ -9,8 +9,20 @@ class Keeplived():
         utils.exec_cmd(cmd)
 
 
-    def modify_conf(self,interface,IP_list,):
-        pass
+    def modify_conf(self,filepath,router_id, interface, virtual_router_id, priority,unicast_src_ip, unicast_peer_list, virtual_ipaddress):
+        editor = utils.FileEdit("./keeplived.conf")
+        editor.replace_data("router_id LVS_DEVEL",f"router_id {router_id}")
+        editor.replace_data("priority 100",f"priority {priority}")
+        editor.replace_data("interface eno1", f"interface {interface}")
+        editor.replace_data("virtual_router_id 60",f"virtual_router_id {virtual_router_id}")
+        editor.replace_data("unicast_src_ip 127.0.0.1", f"unicast_src_ip {unicast_src_ip}")
+        unicast_peer_data = ""
+        for unicast_peer in unicast_peer_list:
+            unicast_peer_data += f"    {unicast_peer}\n"
+        editor.insert_data(unicast_peer_data,anchor="  unicast_peer {",type='under')
+        editor.insert_data(f"    {virtual_ipaddress}",anchor="  virtual_ipaddress {",type='under')
+
+        utils.exec_cmd(f'echo "{editor.data}" > {filepath}', self.conn)
 
 
 class HAproxy():
@@ -57,24 +69,6 @@ class KubeKey():
 
 
 
-
-
-
-
-
-
-# def modify_hx():
-#     lst = []
-#     if not os.path.exists("./haproxy.cfg"):
-#         print("haproxy.cfg 文件不存在，退出")
-#         sys.exit()
-#     with open("./haproxy.cfg") as f:
-#         data = f.read()
-#
-#     for ssh in self.conn.list_ssh:
-#         handler = action.HAproxy(ssh)
-#         lst.append(gevent.spawn(handler.modify_cfg,data))
-#     gevent.joinall(lst)
 
 
 

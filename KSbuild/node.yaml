@@ -1,23 +1,23 @@
 host:
-  - { name: hp225, address: 10.203.1.225, internalAddress: 10.203.1.225, user: ubuntu, password: Feixi@123, root_password: Feixi@123 }
-  - { name: hp226, address: 10.203.1.226, internalAddress: 10.203.1.226, user: ubuntu, password: Feixi@123, root_password: Feixi@123 }
-  - { name: hp227, address: 10.203.1.227, internalAddress: 10.203.1.227, user: ubuntu, password: Feixi@123, root_password: Feixi@123 }
+  - { name: ubuntu, address: 10.203.1.159, internalAddress: 10.203.1.159, user: ubuntu, password: vince@123, root_password: vince@123 }
+  - { name: vince2, address: 10.203.1.157, internalAddress: 10.203.1.157, user: vince2, password: password, root_password: password }
+  - { name: vince4, address: 10.203.1.156, internalAddress: 10.203.1.156, user: vince4, password: password, root_password: password }
 
 
 HAproxy:
   server:
-    - { name: hp225, port: 6443}
-    - { name: hp226, port: 6443}
-    - { name: hp227, port: 6443}
+    - { name: ubuntu, port: 6443}
+    - { name: vince2, port: 6443}
+    - { name: vince4, port: 6443}
 
-keeplived:
+Keeplived:
   host:
-    - { name: hp225, interface: eno1, priority: 100 }
-    - { name: hp226, interface: eno1, priority: 90 }
-    - { name: hp227, interface: eno1, priority: 80 }
+    - { name: ubuntu, interface: eno1test, priority: 100test }
+    - { name: vince2, interface: eno1test, priority: 90test }
+    - { name: vince4, interface: eno1test, priority: 80test }
   router_id: LVS_DEVEL
   virtual_router_id: 60
-  virtual_ipaddress: 10.203.1.228/32
+  virtual_ipaddress: 10.203.1.151/32
 
 
 # spec roleGroups master
@@ -25,16 +25,16 @@ KubeKey:
   spec:
     roleGroups:
       etcd:
-      - hp225
-      - hp226
-      - hp227
+      - ubuntu
+      - vince2
+      - vince4
       master:
-      - hp225
-      - hp226
-      - hp227
+      - ubuntu
+      - vince2
+      - vince4
     controlPlaneEndpoint:
       domain: lb.kubesphere.local
-      address: "10.203.1.228"
+      address: "10.203.1.151"
       port: 8443
     kubernetes:
       version: v1.20.4
