@@ -29,7 +29,6 @@ class Connect():
 
         return Connect._instance
 
-
     def get_master_ssh(self):
         local_ip = utils.get_host_ip()
         for node in self.conf_file.get_master_ssh_data():
@@ -62,12 +61,27 @@ class KSConsole():
             lst.append(gevent.spawn(handler.install))
         gevent.joinall(lst)
 
-    def install_keeplived(self):
+    def install_keepalived(self):
         lst = []
         for ssh in self.conn.list_master_ssh:
-            handler = action.Keeplived(ssh)
+            handler = action.Keepalived(ssh)
             lst.append(gevent.spawn(handler.install))
         gevent.joinall(lst)
+
+    def install_docker(self):
+        lst = []
+        list_all_node  = []
+        list_all_node.extend(self.conn.list_master_ssh)
+        list_all_node.extend(self.conn.list_worker_ssh)
+
+        for ssh in list_all_node:
+            handler = action.KubeKey(ssh)
+            lst.append(gevent.spawn(handler.install_docker))
+        gevent.joinall(lst)
+
+    def install_kk(self):
+        handler = action.KubeKey()
+        handler.install_kk()
 
     def modify_haproxy(self):
         lst = []
@@ -85,23 +99,23 @@ class KSConsole():
             lst.append(gevent.spawn(handler.modify_cfg,"/etc/haproxy/haproxy.cfg",data))
         gevent.joinall(lst)
 
-    def modify_keeplived(self):
+    def modify_keepalived(self):
         lst = []
-        if not os.path.exists("./keeplived.conf"):
-            print("keeplived.conf 文件不存在，退出")
+        if not os.path.exists("keepalived.conf"):
+            print("keepalived.conf 文件不存在，退出")
             sys.exit()
 
-        router_id = self.conn.data['Keeplived']['router_id']
-        virtual_router_id = self.conn.data['Keeplived']['virtual_router_id']
-        virtual_ipaddress = self.conn.data['Keeplived']['virtual_ipaddress']
+        router_id = self.conn.data['Keepalived']['router_id']
+        virtual_router_id = self.conn.data['Keepalived']['virtual_router_id']
+        virtual_ipaddress = self.conn.data['Keepalived']['virtual_ipaddress']
 
         for ssh,master in zip(self.conn.list_master_ssh,self.conn.conf_file.master_list):
             unicast_peer_list = []
             interface = ""
             priority = ""
             unicast_src_ip = ""
-            handler = action.Keeplived(ssh)
-            for host in self.conn.data['Keeplived']['host']:
+            handler = action.Keepalived(ssh)
+            for host in self.conn.data['Keepalived']['host']:
                 if master == host['name']:
                     unicast_src_ip = self.conn.conf_file.get_ip(host['name'])
                     interface = host['interface']
@@ -114,7 +128,7 @@ class KSConsole():
                 sys.exit()
 
             lst.append(gevent.spawn(handler.modify_conf,
-                                    "./keeplived_test.conf",
+                                    "/etc/keepalived/keepalived.conf",
                                     router_id,
                                     interface,
                                     virtual_router_id,
@@ -126,6 +140,21 @@ class KSConsole():
         gevent.joinall(lst)
 
 
+    def modify_kk(self):
+        handler = action.KubeKey()
+        confile = utils.ConfFile()
+        hosts = confile.get_kk_hosts()
+        etcd = confile.get_kk_etcd()
+        master = confile.get_kk_masters()
+        worker = confile.get_kk_worker()
+        vip = confile.get_kk_vip()
+        port = confile.get_kk_port()
+        handler.modify_config(hosts,etcd,master,worker,vip,port)
+
+    def buidl_ks(self):
+        handler = action.KubeKey()
+        handler.build()
+
 
     def restart_haproxy(self):
         lst = []
@@ -134,6 +163,12 @@ class KSConsole():
             lst.append(gevent.spawn(handler.restart))
         gevent.joinall(lst)
 
+    def restart_keepalived(self):
+        lst = []
+        for ssh in self.conn.list_master_ssh:
+            handler = action.Keepalived(ssh)
+            lst.append(gevent.spawn(handler.restart))
+        gevent.joinall(lst)
 
 
-KSConsole().modify_keeplived()
+KSConsole().modify_kk()

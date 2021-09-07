@@ -4,12 +4,8 @@ import socket
 import os
 import subprocess
 import time
-import json
 import prettytable
 import logging
-import pexpect
-import re
-import sys
 
 class SSHConn(object):
 
@@ -145,56 +141,87 @@ class FileEdit():
 
 class ConfFile():
     def __init__(self):
-        self.yaml_file = './node.yaml'
         self.data = self.read_yaml()
-        self.master_list = self.data['KubeKey']['spec']['roleGroups']['master']
+        self.master_list = self.data['KubeKey']['master']
 
-
-    def read_yaml(self):
+    def read_yaml(self,filename='./node.yaml'):
         """读YAML文件"""
         try:
-            with open(self.yaml_file, 'r', encoding='utf-8') as f:
+            with open(filename, 'r', encoding='utf-8') as f:
                 yaml_dict = yaml.safe_load(f)
             return yaml_dict
         except FileNotFoundError:
-            print("Please check the file name:", self.yaml_file)
+            print("Please check the file name:", filename)
         except TypeError:
             print("Error in the type of file name.")
 
-    def update_yaml(self):
+    def update_yaml(self, data, filename='./node.yaml'):
         """更新文件内容"""
-        with open(self.yaml_file, 'w', encoding='utf-8') as f:
-            yaml.dump(self.data, f,default_flow_style=False)
+        with open(filename, 'w', encoding='utf-8') as f:
+            yaml.dump(data, f, default_flow_style=False)
 
     def get_master_ssh_data(self):
         ssh_list = []
         for host in self.data['host']:
-            if host in self.master_list:
+            if host['name'] in self.master_list:
                 ssh_list.append([host['address'],22,'root',host['root_password']])
         return ssh_list
 
     def get_worker_ssh_data(self):
         ssh_list = []
         for host in self.data['host']:
-            if not host in self.master_list:
+            if not host['name'] in self.master_list:
                 ssh_list.append([host['address'],22,'root',host['root_password']])
         return ssh_list
 
-    def get_KubeKey_conf(self):
+    def get_kk_hosts(self):
         hosts = self.data['host']
+        str_all = ""
         for host in hosts:
             host.pop("root_password")
+            str_host = "  - {name: %s, address: %s, internalAddress: %s, user: %s, password: %s}\n"%(host["name"],host["address"],host["internalAddress"],host["user"],host["password"])
+            str_all+=str_host
+        return str_all
 
-        kk = self.data['KubeKey']
-        kubekey_conf = {'KubeKey': {'spec':{'host':hosts,'roleGroups':kk['spec']['roleGroups'],'controlPlaneEndpoint':kk['spec']['controlPlaneEndpoint'],'kubernetes':kk['spec']['kubernetes'],'network':kk['spec']['network']}}}
-        with open("./config-sample.yaml",'w',encoding='utf-8') as f:
-            yaml.dump(kubekey_conf, f, default_flow_style=False)
+    def get_kk_etcd(self):
+        etcds = self.data['KubeKey']['etcd']
+        str_all = ""
+        for etcd in etcds:
+            str_etcd = f"    - {etcd}\n"
+            str_all+=str_etcd
+        return str_all
+
+    def get_kk_masters(self):
+        masters = self.data['KubeKey']['master']
+        str_all = ""
+        for master in masters:
+            str_master = f"    - {master}\n"
+            str_all+=str_master
+        return str_all
+
+    def get_kk_worker(self):
+        workers = self.data['KubeKey']['worker']
+        if not workers:
+            return ""
+        str_all = ""
+        for worker in workers:
+            str_worker = f"    - {worker}\n"
+            str_all+=str_worker
+        return str_all
+
+    def get_kk_vip(self):
+        vip = self.data['KubeKey']['address']
+        return f'"{vip}"'
+
+    def get_kk_port(self):
+        return self.data['KubeKey']['port']
+
+
 
     def get_ip(self,hostname):
         for host in self.data['host']:
             if host['name'] == hostname:
                 return host['address']
-
 
 
 class Table():
@@ -248,11 +275,20 @@ def exec_cmd(cmd,conn=None):
     else:
         result = subprocess.getoutput(cmd)
     result = result.decode() if isinstance(result,bytes) else result
-    log_data = f'{conn._host if conn else "localhost"} - {cmd} - {result}'
+    log_data = f'{conn._host if conn else "localhost"} - {cmd} - \n{result}'
     Log().logger.info(log_data)
     if result:
         result = result.rstrip('\n')
     return result
+
+
+def exec_cmd_realtime(cmd):
+  process = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+  while process.poll() is None:
+    line = process.stdout.readline()
+    line = line.strip()
+    if line:
+      print(line.decode())
 
 
 def run_timeout(flag,run,timeout=30):
@@ -287,4 +323,3 @@ class Log():
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         fh.setFormatter(formatter)
         logger.addHandler(fh)
-
