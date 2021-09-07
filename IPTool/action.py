@@ -18,12 +18,10 @@ class IpService(object):
                 return True
         return False
 
-
-    def get_mode(self,bonding_name):
+    def get_mode(self, bonding_name):
         cmd = f"cat /proc/net/bonding/{bonding_name} | grep Bonding"
-        result = utils.exec_cmd(cmd,self.conn)
+        result = utils.exec_cmd(cmd, self.conn)
         return result["rt"]
-
 
     def up_ip_service(self, connection_name):
         cmd = f"nmcli connection up id {connection_name}"
@@ -140,6 +138,6 @@ class IpService(object):
             if result["st"]:
                 return result["rt"]
 
-    def modify_hosts_file(self,old_hostname,new_hostname):
+    def modify_hosts_file(self, old_hostname, new_hostname):
         cmd = f"sed -i 's/{old_hostname}$/{new_hostname}/g' /etc/hosts"
         utils.exec_cmd(cmd, self.conn)
