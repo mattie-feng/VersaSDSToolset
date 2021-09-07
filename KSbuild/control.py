@@ -26,7 +26,6 @@ class Connect():
             Connect._instance.data = Connect._instance.conf_file.data
             Connect.get_master_ssh(Connect._instance)
             Connect.get_worker_ssh(Connect._instance)
-
         return Connect._instance
 
     def get_master_ssh(self):
@@ -85,7 +84,7 @@ class KSConsole():
 
     def modify_haproxy(self):
         lst = []
-        if not os.path.exists("./haproxy.cfg"):
+        if not os.path.exists("./sample-haproxy.cfg"):
             print("haproxy.cfg 文件不存在，退出")
             sys.exit()
         data = ""
@@ -101,7 +100,7 @@ class KSConsole():
 
     def modify_keepalived(self):
         lst = []
-        if not os.path.exists("keepalived.conf"):
+        if not os.path.exists("./sample-keepalived.conf"):
             print("keepalived.conf 文件不存在，退出")
             sys.exit()
 
