@@ -144,7 +144,7 @@ class ConfFile():
         self.data = self.read_yaml()
         self.master_list = self.data['KubeKey']['master']
 
-    def read_yaml(self,filename='./node.yaml'):
+    def read_yaml(self,filename='./config.yaml'):
         """读YAML文件"""
         try:
             with open(filename, 'r', encoding='utf-8') as f:
@@ -155,7 +155,7 @@ class ConfFile():
         except TypeError:
             print("Error in the type of file name.")
 
-    def update_yaml(self, data, filename='./node.yaml'):
+    def update_yaml(self, data, filename='./config.yaml'):
         """更新文件内容"""
         with open(filename, 'w', encoding='utf-8') as f:
             yaml.dump(data, f, default_flow_style=False)
