@@ -109,8 +109,7 @@ class Corosync():
         time.sleep(0)
 
 
-
-    def change_corosync_conf(self,cluster_name,bindnetaddr,interface,nodelist):
+    def change_corosync_conf(self,cluster_name,bindnetaddr,interface,nodelist,single_interface=False):
         # editor = utils.FileEdit(corosync_conf_path) # 读取原配置文件数据
         editor = utils.FileEdit(read_data)
 
@@ -121,7 +120,8 @@ class Corosync():
                             f"bindnetaddr: {bindnetaddr}")
 
         interface = utils.FileEdit.add_data_to_head(interface, '\t') # 缩进处理
-        editor.insert_data(interface,anchor=self.interface_pos,type='under')
+        if not single_interface:
+            editor.insert_data(interface,anchor=self.interface_pos,type='under')
         editor.insert_data(nodelist, anchor=self.nodelist_pos,type='above')
 
         # editor = utils.FileEdit(read_data) # 恢复原始配置文件，需要read_data存在
@@ -232,6 +232,16 @@ class Pacemaker():
         version = re.findall('\(version\s(.*)\)\s',result)
         if version:
             return version[0]
+
+
+    def config_drbd_attr(self):
+        cmd1 = 'crm config primitive drbd-attr ocf:linbit:drbd-attr'
+        cmd2 = 'crm config clone drbd-attr-clone drbd-attr'
+        utils.exec_cmd(cmd1, self.conn)
+        utils.exec_cmd(cmd2, self.conn)
+
+
+
 
 
 class TargetCLI():

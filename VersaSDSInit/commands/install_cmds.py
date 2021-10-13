@@ -8,7 +8,7 @@ import utils
 class InstallCommands():
     def __init__(self, sub_parser):
         self.subp = sub_parser
-        self.setup_parser()
+        self.parser = self.setup_parser()
 
     def setup_parser(self):
         parser_install = self.subp.add_parser(
