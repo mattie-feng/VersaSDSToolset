@@ -1,6 +1,6 @@
 backup_path: /backupdir
 cluster: cluster
-single_heartbeat_line: true
+single_heartbeat_line: false
 node:
 - hostname: vince1
   lvm_device: vg0
