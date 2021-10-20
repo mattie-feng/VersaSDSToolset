@@ -35,8 +35,7 @@ class Connect():
             if local_ip == node['public_ip']:
                 self.list_ssh.append(None)
             else:
-                self.list_ssh.append(ssh.make_connect(node['public_ip'],node['port'],'root',node['root_password']))
-
+                self.list_ssh.append(ssh.make_connect(node['public_ip'],node['port'],'root',node['root_password']))    
 
 class PacemakerConsole():
     def __init__(self):
@@ -334,7 +333,7 @@ class LinstorConsole():
                 ha.stop_controller()
                 ha.backup_linstor(backup_path) # 要放置备份文件的路径（文件夹）
                 ha.move_database(backup_path)
-                ha.add_linstordb_to_pacemaker(2)
+                ha.add_linstordb_to_pacemaker(len(self.conn.cluster['node']))
 
 
     def check_ha_controller(self,timeout=30):
