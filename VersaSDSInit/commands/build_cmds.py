@@ -1,7 +1,7 @@
 import sys
 import time
 
-
+import action
 import control
 from .install_cmds import InstallCommands
 
@@ -43,6 +43,9 @@ class BuildCommands():
 
         p_controller = subp_build.add_parser('controller' ,help='build HA linstor-controller')
         p_controller.set_defaults(func=self.build_controller)
+
+        p_drbd_attr = subp_build.add_parser('drbdattr', help='build drbd-attr')
+        p_drbd_attr.set_defaults(func=self.build_drbd_attr)
 
 
     def build_ip(self, args):
@@ -147,23 +150,31 @@ class BuildCommands():
         print('*success*')
 
 
+    def build_drbd_attr(self, args):
+        print('*start*')
+        pcm = action.Pacemaker()
+        pcm.config_drbd_attr()
+        print('*success*')
+
 
     def build_all(self,args):
-        # controller_lvm = control.LVMConsole()
-        # controller_linstor = control.LinstorConsole()
+        controller_lvm = control.LVMConsole()
+        controller_linstor = control.LinstorConsole()
 
         InstallCommands.install_software(args)
         print("1. 安装软件完成")
-        # self.build_pacemaker_cluster(args)
-        # print("2. 配置pacemaker集群完成")
-        # controller_lvm.create_dirver_pool()
-        # print('创建PV/VG/LV成功')
-        # controller_linstor.create_conf_file()
-        # controller_linstor.create_nodes()
-        # print('创建节点成功')
-        # controller_linstor.create_pools()
-        # print('创建存储池pool0成功')
-        # self.build_controller(args)
-        # print("3. HA Controller配置完成")
+        self.build_pacemaker_cluster(args)
+        print("2. 配置pacemaker集群完成")
+        controller_lvm.create_dirver_pool()
+        print('创建PV/VG/LV成功')
+        controller_linstor.create_conf_file()
+        controller_linstor.create_nodes()
+        print('创建节点成功')
+        controller_linstor.create_pools()
+        print('创建存储池pool0成功')
+        self.build_controller(args)
+        print("3. HA Controller配置完成")
+        self.build_drbd_attr(args)
+        print("4. drbd-attr 配置完成")
 
 
