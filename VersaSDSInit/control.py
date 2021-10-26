@@ -35,8 +35,7 @@ class Connect():
             if local_ip == node['public_ip']:
                 self.list_ssh.append(None)
             else:
-                self.list_ssh.append(ssh.make_connect(node['public_ip'],node['port'],'root',node['root_password']))
-
+                self.list_ssh.append(ssh.make_connect(node['public_ip'],node['port'],'root',node['root_password']))    
 
 class PacemakerConsole():
     def __init__(self):
@@ -93,16 +92,17 @@ class PacemakerConsole():
         bindnetaddr = self.conn.conf_file.get_bindnetaddr()[0]
         interface = self.conn.conf_file.get_inferface()
         nodelist = self.conn.conf_file.get_nodelist()
+        single_interface = self.conn.cluster['single_heartbeat_line']
 
         for ssh in self.conn.list_ssh:
             lst.append(gevent.spawn(action.Corosync(ssh).change_corosync_conf,
                                     cluster_name,
                                     bindnetaddr,
                                     interface,
-                                    nodelist))
+                                    nodelist,
+                                    single_interface))
 
         gevent.joinall(lst)
-
 
     def restart_corosync(self):
         lst = []
@@ -115,8 +115,6 @@ class PacemakerConsole():
             print('Restarting corosync service timed out')
         else:
             timeout.close()
-
-
 
     def check_corosync(self):
         nodes = [node['hostname'] for node in self.conn.cluster['node']]
@@ -138,8 +136,6 @@ class PacemakerConsole():
                 lst.append(False)
         return lst
 
-
-
     def packmaker_conf_change(self):
         cluster_name = self.conn.conf_file.get_cluster_name()
         packmaker = action.Pacemaker()
@@ -154,7 +150,6 @@ class PacemakerConsole():
         self.conn.conf_file.cluster['cluster'] = cluster_name
         self.conn.conf_file.update_yaml()
 
-
     def check_packmaker(self):
         cluster_name = self.conn.cluster['cluster']
         packmaker = action.Pacemaker()
@@ -162,8 +157,6 @@ class PacemakerConsole():
             return [True] * len(self.conn.list_ssh)
         else:
             return [False] * len(self.conn.list_ssh)
-
-
 
     def targetcli_conf_change(self):
         lst = []
@@ -175,7 +168,6 @@ class PacemakerConsole():
 
         gevent.joinall(lst)
 
-
     def check_targetcli(self):
         lst = []
         for ssh in self.conn.list_ssh:
@@ -185,7 +177,6 @@ class PacemakerConsole():
         gevent.joinall(lst)
         result = [job.value for job in lst]
         return result
-
 
     def service_set(self):
         lst = []
@@ -199,8 +190,6 @@ class PacemakerConsole():
             lst.append(gevent.spawn(executor.set_enable_corosync))
 
         gevent.joinall(lst)
-
-
 
     def check_service(self):
         lst = []
@@ -220,7 +209,6 @@ class PacemakerConsole():
                 lst.append(False)
         return lst
 
-
     def replace_ra(self):
         other_node = []
         for ssh,node in zip(self.conn.list_ssh,self.conn.cluster['node']):
@@ -236,8 +224,6 @@ class PacemakerConsole():
         executor.rename_ra()
         for node in other_node:
             executor.scp_ra(node)
-
-
 
     def check_ra(self):
         lst = []
@@ -282,6 +268,7 @@ class PacemakerConsole():
             ip_service = action.IpService(ssh)
             lst_up.append(gevent.spawn(ip_service.up_ip_service, node['private_ip']['device']))
         gevent.joinall(lst_up)
+
 
 
 class LinstorConsole():
@@ -346,7 +333,7 @@ class LinstorConsole():
                 ha.stop_controller()
                 ha.backup_linstor(backup_path) # 要放置备份文件的路径（文件夹）
                 ha.move_database(backup_path)
-                ha.add_linstordb_to_pacemaker(2)
+                ha.add_linstordb_to_pacemaker(len(self.conn.cluster['node']))
 
 
     def check_ha_controller(self,timeout=30):

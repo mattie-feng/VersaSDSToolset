@@ -22,7 +22,8 @@ class Keepalived():
         editor.insert_data(unicast_peer_data,anchor="  unicast_peer {",type='under')
         editor.insert_data(f"    {virtual_ipaddress}",anchor="  virtual_ipaddress {",type='under')
 
-        utils.exec_cmd(f'echo "{editor.data}" > {filepath}', self.conn)
+        editor.data = rf"{editor.data}"
+        utils.exec_cmd(f"echo '{editor.data}' > {filepath}", self.conn)
 
 
     def restart(self):
@@ -47,7 +48,7 @@ class HAproxy():
     def modify_cfg(self,file_path,data):
         editor = utils.FileEdit("./sample-haproxy.cfg")
         editor.insert_data(f"{data}",f'    default-server inter 10s downinter 5s rise 2 fall 2 slowstart 60s maxconn 250 maxqueue 256 weight 100', type='under')
-        utils.exec_cmd(f'echo "{editor.data}" > {file_path}', self.conn)
+        utils.exec_cmd(f"echo '{editor.data}' > {file_path}", self.conn)
 
 
     def restart(self):
@@ -78,9 +79,9 @@ class KubeKey():
         editor.insert_data(etcd,anchor="    etcd:",type="under")
         editor.insert_data(master,anchor="    master:",type="under")
         editor.insert_data(worker,anchor="    worker:",type="under")
-        editor.replace_data('    address: ""',f'    address: "{vip}"')
+        editor.replace_data('    address: ""',f'    address: {vip}')
         editor.replace_data('    port: 8443',f'    port: {port}')
-        utils.exec_cmd(f'echo "{editor.data}" > config-sample.yaml', self.conn)
+        utils.exec_cmd(f"echo '{editor.data}' > config-sample.yaml", self.conn)
 
     def build(self):
         utils.exec_cmd_realtime("./kk create cluster -f config-sample.yaml -y")
