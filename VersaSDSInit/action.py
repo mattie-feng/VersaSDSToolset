@@ -136,14 +136,17 @@ class Corosync():
 
 
 
-    def check_ring_status(self,node):
+    def check_ring_status(self,node,single_interface=False):
         cmd = 'corosync-cfgtool -s'
         data = utils.exec_cmd(cmd,self.conn)
         ring_data = re.findall('RING ID\s\d*[\s\S]*?id\s*=\s*(.*)',data)
-        if len(ring_data) == 2:
-            if node['public_ip'] in ring_data and node['private_ip']['ip'] in ring_data:
+        if single_interface:
+            if node['private_ip']['ip'] in ring_data:
                 return True
-
+        else:
+            if len(ring_data) == 2:
+                if node['public_ip'] in ring_data and node['private_ip']['ip'] in ring_data:
+                    return True
 
 
     def check_corosync_status(self,nodes,timeout=30):
