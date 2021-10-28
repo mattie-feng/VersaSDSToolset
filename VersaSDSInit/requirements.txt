@@ -1,0 +1,5 @@
+prettytable==0.7.2
+paramiko==2.7.1
+gevent==20.5.2
+pexpect==4.8.0
+PyYAML==5.4.1
