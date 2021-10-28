@@ -88,11 +88,11 @@ class PacemakerConsole():
 
     def corosync_conf_change(self):
         lst = []
+        single_interface = self.conn.cluster['single_heartbeat_line'] 
         cluster_name = self.conn.conf_file.get_cluster_name()
         bindnetaddr = self.conn.conf_file.get_bindnetaddr()[0]
         interface = self.conn.conf_file.get_inferface()
-        nodelist = self.conn.conf_file.get_nodelist()
-        single_interface = self.conn.cluster['single_heartbeat_line']
+        nodelist = self.conn.conf_file.get_nodelist(single_interface)
 
         for ssh in self.conn.list_ssh:
             lst.append(gevent.spawn(action.Corosync(ssh).change_corosync_conf,
@@ -118,11 +118,12 @@ class PacemakerConsole():
 
     def check_corosync(self):
         nodes = [node['hostname'] for node in self.conn.cluster['node']]
+        single_interface = self.conn.cluster['single_heartbeat_line']
         lst_ring_status = []
         lst_cluster_status = []
         for ssh,node in zip(self.conn.list_ssh,self.conn.cluster['node']):
             corosync = action.Corosync(ssh)
-            lst_ring_status.append(gevent.spawn(corosync.check_ring_status,node))
+            lst_ring_status.append(gevent.spawn(corosync.check_ring_status,node,single_interface))
             lst_cluster_status.append(gevent.spawn(corosync.check_corosync_status,nodes))
 
         gevent.joinall(lst_ring_status)
