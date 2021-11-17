@@ -190,17 +190,20 @@ class ConfFile():
         interface = "interface {\n\tringnumber: 1\n\tbindnetaddr: %s\n\tmcastport: 5407\n\tttl: 1\n}"%bindnetaddr
         return interface
 
-    def get_nodelist(self):
+    def get_nodelist(self,single=False):
         str_node_all = ""
         for node in self.cluster['node']:
             str_node = "node "
             dict_node = {'ring0_addr':node['public_ip'],'ring1_addr':node['private_ip']['ip'],'name':node['hostname']}
+            if single:
+                dict_node = {'ring0_addr':node['private_ip']['ip'],'name':node['hostname']}
             str_node += json.dumps(dict_node, indent=4, separators=(',', ': '))
             str_node = FileEdit.remove_comma(str_node)
             str_node_all += str_node + '\n'
         str_node_all = FileEdit.add_data_to_head(str_node_all, '\t')
         str_nodelist = "nodelist {\n%s\n}"%str_node_all
         return str_nodelist
+
 
 
 class Table():
@@ -293,5 +296,3 @@ class Log():
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         fh.setFormatter(formatter)
         logger.addHandler(fh)
-
-
