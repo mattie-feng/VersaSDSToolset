@@ -1,0 +1,20 @@
+test_mode: drbd_in_used
+test_times: 1
+resource: LUN3
+target: target2
+device: bond0
+crm_log_path: /home/horatio/mattie
+versaplx:
+- hostname: VersaPLX06
+  public_ip: 10.203.1.43
+  port: 22
+  password: password
+- hostname: VersaPLX07
+  public_ip: 10.203.1.45
+  port: 22
+  password: password
+- hostname: VersaPLX08
+  public_ip: 10.203.1.44
+  username: horatio
+  port: 22
+  password: password
