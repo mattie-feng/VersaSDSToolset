@@ -62,6 +62,20 @@ class DebugLog(object):
         if result["st"]:
             return True
 
+    def get_dmesg_file(self, path):
+        # 显示内核缓冲日志
+        cmd = f'dmesg -T | cat > {path}/dmesg.log'
+        result = utils.exec_cmd(cmd, self.logger, self.conn)
+        if result["st"]:
+            return True
+
+    def clear_dmesg(self, path):
+        # 清空内核缓存信息
+        cmd = f'dmesg -C'
+        result = utils.exec_cmd(cmd, self.logger, self.conn)
+        if result["st"]:
+            return True
+
 
 class InstallSoftware(object):
     def __init__(self, logger, conn=None):
@@ -100,19 +114,29 @@ class InstallSoftware(object):
         if result["st"]:
             return True
 
-    def install_vplx(self, ip=None):
-        # TODO 待改
-        if ip:
-            cmd = f'scp -r vplx root@{ip}:/tmp'
-            result = utils.exec_cmd(cmd, self.logger)
-        else:
-            cmd = f'cp -r vplx /tmp'
-            result = utils.exec_cmd(cmd, self.logger)
+    def install_vplx(self):
+        result = utils.upload_file(self.logger, "vplx", "/tmp", self.conn)
         if result["st"]:
             cmd_pip = f'pip3 install -r /tmp/vplx/requirements.txt'
-            result_pip = utils.exec_cmd(cmd_pip, self.logger)
-            if not result_pip["st"]:
-                print("Please install python module on /tmp/requirements.txt")
+            result_pip = utils.exec_cmd(cmd_pip, self.logger, self.conn)
+            # if not result_pip["st"]:
+            #     print("Please install python module on /tmp/requirements.txt")
+        # if self.conn:
+        #     cmd = f'scp -r vplx root@{utils.get_global_dict_value(self.conn)}:/tmp'
+        #     result = utils.exec_cmd(cmd, self.logger)
+        # else:
+        #     cmd = f'cp -r vplx /tmp'
+        #     result = utils.exec_cmd(cmd, self.logger)
+        # if result["st"]:
+        #     cmd_pip = f'pip3 install -r /tmp/vplx/requirements.txt'
+        #     result_pip = utils.exec_cmd(cmd_pip, self.logger, self.conn)
+        #     # if not result_pip["st"]:
+        #     #     print("Please install python module on /tmp/requirements.txt")
+
+    def get_log(self):
+        result = utils.download_file(self.logger, "/root/VersaSDSToolset/AutomatedTesting/crm_report_test1_2021-11-16_1.log.tar.bz2", "./", self.conn)
+        if result["st"]:
+            return True
 
 
 class Stor(object):

@@ -101,48 +101,71 @@ class QuorumAutoTest(object):
         gevent.joinall(lst_install_drbd)
         gevent.joinall(lst_install_linstor)
 
-    def install_vplx(self):
-        # TODO 待改
-        install_obj = action.InstallSoftware(self.logger)
-        install_obj.update_pip()
-        local_ip = utils.get_host_ip()
-        ip_list = [vplx_config["public_ip"] for vplx_config in self.vplx_configs]
-        if local_ip in ip_list:
-            install_obj.install_vplx()
-            return
-        install_obj.install_vplx(ip_list[0])
-
     def test_drbd_quorum(self):
         sp = "sp_quorum"
         resource = "res_quorum"
+        if len(self.conn.list_vplx_ssh) != 3:
+            utils.prt_log(self.logger, None, f"Please make sure there are three nodes for this test", 2)
         test_times = self.config.get_test_times()
-        # self.install_software()
-        # self.install_vplx()
-        stor_obj = action.Stor(self.logger)
         use_case = self.config.get_use_case()
         size = self.config.get_resource_size()
+        node_list = [vplx_config["hostname"] for vplx_config in self.vplx_configs]
+        vtel_conn = None
+        if None not in self.conn.list_vplx_ssh:
+            vtel_conn = self.conn.list_vplx_ssh[0]
+        # utils.prt_log(self.logger, None, f"Start to install software ...", 0)
+        # self.install_software()
+        # install_obj = action.InstallSoftware(self.logger, vtel_conn)
+        # install_obj.update_pip()
+        # install_obj.install_vplx()
+        # install_obj.get_log()
+        stor_obj = action.Stor(self.logger, vtel_conn)
+        # utils.prt_log(self.logger, vtel_conn, f"Start to create node ...", 0)
         # for vplx_config in self.vplx_configs:
-        #     stor_obj.create_node(vplx_config["hostname"], vplx_config["public_ip"])
+        #     stor_obj.create_node(vplx_config["hostname"], vplx_config["private_ip"]["ip"])
+        # utils.prt_log(self.logger, vtel_conn, f"Start to create storagepool {sp} ...", 0)
         # for vplx_config in self.vplx_configs:
         #     stor_obj.create_sp(vplx_config["hostname"], sp, vplx_config["lvm_device"])
+        # diskful_node_list = node_list[:]
+        # utils.prt_log(self.logger, vtel_conn, f"Start to create resource {resource} ...", 0)
+        # if use_case == 1:
+        #     diskless_node = diskful_node_list.pop()
+        #     stor_obj.create_diskful_resource(diskful_node_list, sp, size, resource)
+        #     stor_obj.create_diskless_resource(diskless_node, resource)
+        # if use_case == 2:
+        #     stor_obj.create_diskful_resource(diskful_node_list, sp, size, resource)
+        # time.sleep(5)
         for i in range(test_times):
             i = i + 1
             utils.set_times(i)
             print(f"Number of test times --- {i}")
-            diskful_node_list = [vplx_config["hostname"] for vplx_config in self.vplx_configs]
-            if use_case == 1:
-                diskless_node = diskful_node_list.pop()
-                stor_obj.create_diskful_resource(diskful_node_list, sp, size, resource)
-                stor_obj.create_diskless_resource(diskless_node, resource)
-            if use_case == 2:
-                stor_obj.create_diskful_resource(diskful_node_list, sp, size, resource)
-            time.sleep(2)
-            stor_obj.get_drbd_status(resource)
-            stor_obj.check_drbd_quorum(resource)
-            device_name = stor_obj.get_device_name(resource)
-            self.test_by_dd(device_name, resource)
-
-            stor_obj.delete_resource(resource)
+            if not stor_obj.check_drbd_quorum(resource):
+                utils.prt_log(self.logger, None, f"Abnormal quorum status of {resource}", 1)
+                break
+            resource_status, peer_resource_status = stor_obj.get_drbd_status(resource)
+            if resource_status[1] not in ["UpToDate", "Diskless"]:
+                utils.prt_log(self.logger, None, f"Abnormal status of {resource} status", 1)
+                break
+            for peer_resource_st in peer_resource_status:
+                if peer_resource_st[1] not in ["UpToDate", "Diskless"]:
+                    utils.prt_log(self.logger, None, f"Abnormal status of {resource} status", 1)
+                    break
+            stor_obj.primary_drbd(resource)
+            time.sleep(5)
+            stor_obj.secondary_drbd(resource)
+            # device_name = stor_obj.get_device_name(resource)
+            # self.test_by_dd(device_name, resource)
+            utils.prt_log(self.logger, None, f"Wait 10 minutes...", 0)
+            # time.sleep(600)
+            time.sleep(60)
+        # utils.prt_log(self.logger, vtel_conn, f"Start to delete resource {resource} ...", 0)
+        # stor_obj.delete_resource(resource)
+        # utils.prt_log(self.logger, vtel_conn, f"Start to delete storagepool {sp} ...", 0)
+        # for node in node_list:
+        #     stor_obj.delete_sp(node, sp)
+        # utils.prt_log(self.logger, vtel_conn, f"Start to delete node ...", 0)
+        # for node in node_list:
+        #     stor_obj.delete_node(node)
 
     def test_by_dd(self, device_name, resource):
         # for vplx_conn in self.conn.list_vplx_ssh:
@@ -162,6 +185,13 @@ class QuorumAutoTest(object):
         ip_obj.up_device(device)
         ip_obj.netplan_apply()
         stor_obj.secondary_drbd(resource)
+
+    def get_log(self, conn):
+        log_path = self.config.get_crm_log_path()
+        debug_log = action.DebugLog(self.logger, conn)
+        utils.prt_log(self.logger, conn, f"Start to collect dmesg file ...", 0)
+        debug_log.get_dmesg_file(time, log_path)
+        utils.prt_log(self.logger, conn, f"Finished to collect dmesg file ...", 1)
 
 
 class IscsiTest(object):
@@ -190,7 +220,7 @@ class IscsiTest(object):
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
             if not self.ckeck_drbd_status(resource):
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
-            utils.prt_log(self.logger, self.conn.list_vplx_ssh[0], f"Down {device}...", 0)
+            utils.prt_log(self.logger, self.conn.list_vplx_ssh[0], f"Down {device} ...", 0)
             ip_obj.down_device(device)
             time.sleep(40)
             if not self.check_target_lun_status(target, resource, self.conn.list_vplx_ssh[1]):
@@ -198,7 +228,7 @@ class IscsiTest(object):
                 ip_obj.netplan_apply()
                 time.sleep(30)
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
-            utils.prt_log(self.logger, self.conn.list_vplx_ssh[0], f"Up {device}...", 0)
+            utils.prt_log(self.logger, self.conn.list_vplx_ssh[0], f"Up {device} ...", 0)
             ip_obj.up_device(device)
             ip_obj.netplan_apply()
             time.sleep(30)
@@ -249,7 +279,7 @@ class IscsiTest(object):
         iscsi_obj = action.Iscsi(self.logger, conn)
         iscsi_obj.ref_res()
         time.sleep(10)
-        utils.prt_log(self.logger, conn, f"Move {resource} back to {init_start_node}...", 0)
+        utils.prt_log(self.logger, conn, f"Move {resource} back to {init_start_node} ...", 0)
         iscsi_obj.move_res(resource, init_start_node)
         time.sleep(20)
         crm_status = iscsi_obj.get_crm_status()
@@ -267,4 +297,4 @@ class IscsiTest(object):
         debug_log = action.DebugLog(self.logger, conn)
         utils.prt_log(self.logger, conn, f"Start to collect crm_report...", 0)
         debug_log.get_crm_report_file(time, crm_log_path)
-        utils.prt_log(self.logger, conn, f"Finished to collect crm_report and exit testing...", 2)
+        utils.prt_log(self.logger, conn, f"Finished to collect crm_report and exit testing ...", 2)

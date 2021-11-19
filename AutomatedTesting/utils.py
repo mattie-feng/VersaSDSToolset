@@ -9,6 +9,8 @@ import time
 import traceback
 from functools import wraps
 import log
+import os
+from stat import S_ISDIR as isdir
 
 
 def _init():  # 全局变量初始化
@@ -96,6 +98,34 @@ def exec_cmd(cmd, logger, conn=None):
             return {"st": False, "rt": p.stderr}
 
 
+def upload_file(logger, local, remote, conn=None):
+    oprt_id = log.create_oprt_id()
+    func_name = traceback.extract_stack()[-2][2]
+    logger.write_to_log('', 'DATA', 'STR', func_name, '', oprt_id)
+    logger.write_to_log('', 'OPRT', 'upload', func_name, oprt_id, f"{local} ==> {remote}")
+    if conn:
+        result = conn.sftp_upload(local, remote)
+    else:
+        cmd = f'cp -r {local} {remote}'
+        result = exec_cmd(cmd, logger)
+    logger.write_to_log('', 'DATA', 'upload', func_name, oprt_id, result)
+    return result
+
+
+def download_file(logger, remote, local, conn=None):
+    oprt_id = log.create_oprt_id()
+    func_name = traceback.extract_stack()[-2][2]
+    logger.write_to_log('', 'DATA', 'STR', func_name, '', oprt_id)
+    logger.write_to_log('', 'OPRT', 'download', func_name, oprt_id, f"{remote} ==> {local}")
+    if conn:
+        result = conn.sftp_download(remote, local)
+    else:
+        cmd = f'cp -r {remote} {local}'
+        result = exec_cmd(cmd, logger)
+    logger.write_to_log('', 'DATA', 'download', func_name, oprt_id, result)
+    return result
+
+
 def check_ip(ip):
     """检查IP格式"""
     re_ip = re.compile(
@@ -106,6 +136,14 @@ def check_ip(ip):
     else:
         print(f"ERROR in IP format of {ip}, please check.")
         return False
+
+
+def _check_local(local):
+    if not os.path.exists(local):
+        try:
+            os.mkdir(local)
+        except IOError as err:
+            print(err)
 
 
 def get_host_ip():
@@ -192,6 +230,89 @@ class SSHConn(object):
             if len(data) >= 0:
                 data = data.decode() if isinstance(data, bytes) else data
                 return {"st": True, "rt": data}
+
+    def sftp_upload(self, local, remote):
+        sf = paramiko.Transport((self._host, self._port))
+        sf.connect(username=self._username, password=self._password)
+        sftp = paramiko.SFTPClient.from_transport(sf)
+
+        def _is_exists(path, function):
+            path = path.replace('\\', '/')
+            try:
+                function(path)
+            except Exception as error:
+                return False
+            else:
+                return True
+
+        # 拷贝文件
+        def _copy(sftp, local, remote):
+            # 判断remote是否是目录
+            if _is_exists(remote, function=sftp.chdir):
+                # 是，获取local路径中的最后一个文件名拼接到remote中
+                filename = os.path.basename(os.path.normpath(local))
+                remote = os.path.join(remote, filename).replace('\\', '/')
+            # 如果local为目录
+            if os.path.isdir(local):
+                # 在远程创建相应的目录
+                _is_exists(remote, function=sftp.mkdir)
+                # 遍历local
+                for file in os.listdir(local):
+                    # 取得file的全路径
+                    localfile = os.path.join(local, file).replace('\\', '/')
+                    # 深度递归_copy()
+                    _copy(sftp=sftp, local=localfile, remote=remote)
+            # 如果local为文件
+            if os.path.isfile(local):
+                try:
+                    sftp.put(local, remote)
+                except Exception as error:
+                    print(error)
+                    return {"st": False, "rt": f"{error}"}
+
+        # 检查local
+        if not _is_exists(local, function=os.stat):
+            return {"st": False, "rt": f"{local}: No such file or directory in local"}
+        # 检查remote的父目录
+        remote_parent = os.path.dirname(os.path.normpath(remote))
+        if not _is_exists(remote_parent, function=sftp.chdir):
+            return {"st": False, "rt": f"{remote}: No such file or directory in remote"}
+        # 拷贝文件
+        _copy(sftp=sftp, local=local, remote=remote)
+        return {"st": True, "rt": f"{local} ==> {remote}"}
+
+    def sftp_download(self, remote, local):
+        sf = paramiko.Transport((self._host, self._port))
+        sf.connect(username=self._username, password=self._password)
+        sftp = paramiko.SFTPClient.from_transport(sf)
+        self.download(sftp, remote, local)
+        return {"st": True, "rt": f"{local} ==> {remote}"}
+
+    def download(self, sftp, remote, local):
+        # 检查远程文件是否存在
+        try:
+            result = sftp.stat(remote)
+        except IOError as err:
+            error = '[ERROR %s] %s: %s' % (err.errno, os.path.basename(os.path.normpath(remote)), err.strerror)
+            return {"st": False, "rt": error}
+        else:
+            # 判断远程文件是否为目录
+            if isdir(result.st_mode):
+                dirname = os.path.basename(os.path.normpath(remote))
+                local = os.path.join(local, dirname)
+                _check_local(local)
+                for file in sftp.listdir(remote):
+                    sub_remote = os.path.join(remote, file)
+                    sub_remote = sub_remote.replace('\\', '/')
+                    self.download(sftp, sub_remote, local)
+            else:
+                # 拷贝文件
+                if os.path.isdir(local):
+                    local = os.path.join(local, os.path.basename(remote))
+                try:
+                    sftp.get(remote, local)
+                except IOError as err:
+                    return {"st": False, "rt": err}
 
     def exec_cmd_and_print(self, command):
         result = ''
