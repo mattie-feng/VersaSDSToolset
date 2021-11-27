@@ -45,14 +45,20 @@ class AutomatedTesting():
     def apply_file(self, args):
         utils._init()
         logger = log.Log()
-        config = utils.ConfFile(args.file, logger)
+        utils.set_logger(logger)
+        config = utils.ConfFile(args.file)
         test_mode = config.get_test_mode()
         if test_mode == 'quorum':
-            test_quorum = control.QuorumAutoTest(config, logger)
+            test_quorum = control.QuorumAutoTest(config)
             # test_quorum.ssh_conn_build()
+            # test_quorum.delete_res()
+            # test_quorum.test_thread()
             test_quorum.test_drbd_quorum()
+            # test_quorum.test_get_log()
+            # control.test_multiprocessing()
+            # test_quorum.test_multiprocessing()
         if test_mode == 'drbd_in_used':
-            test_iscsi = control.IscsiTest(config, logger)
+            test_iscsi = control.IscsiTest(config)
             test_iscsi.test_drbd_in_used()
 
 

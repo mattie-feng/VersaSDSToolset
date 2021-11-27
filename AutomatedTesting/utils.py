@@ -20,6 +20,9 @@ def _init():  # 全局变量初始化
     global _times
     _times = 0
 
+    global _logger
+    _logger = None
+
 
 def set_global_dict_value(key, value):
     _global_dict[key] = value
@@ -42,12 +45,22 @@ def get_times():
     return _times
 
 
-def prt_log(logger, conn, str_, warning_level):
+def set_logger(value):
+    global _logger
+    _logger = value
+
+
+def get_logger():
+    return _logger
+
+
+def prt_log(conn, str_, warning_level):
     """
     print, write to log and exit.
     :param logger: Logger object for logging
     :param print_str: Strings to be printed and recorded
     """
+    logger = get_logger()
     print(str(str_))
     if warning_level == 0:
         logger.write_to_log(conn, 'INFO', 'INFO', 'finish', 'output', str_)
@@ -72,13 +85,14 @@ def deco_yaml_dict(func):
             return result
         except Exception as e:
             self.logger.write_to_log(None, 'DATA', 'DEBUG', 'exception', '', str(traceback.format_exc()))
-            print(e)
+            print(f'Error:{e}')
             sys.exit()
 
     return wrapper
 
 
-def exec_cmd(cmd, logger, conn=None):
+def exec_cmd(cmd, conn=None):
+    logger = get_logger()
     oprt_id = log.create_oprt_id()
     func_name = traceback.extract_stack()[-2][2]
     logger.write_to_log(conn, 'DATA', 'STR', func_name, '', oprt_id)
@@ -98,30 +112,32 @@ def exec_cmd(cmd, logger, conn=None):
             return {"st": False, "rt": p.stderr}
 
 
-def upload_file(logger, local, remote, conn=None):
+def upload_file(local, remote, conn=None):
+    logger = get_logger()
     oprt_id = log.create_oprt_id()
     func_name = traceback.extract_stack()[-2][2]
     logger.write_to_log('', 'DATA', 'STR', func_name, '', oprt_id)
-    logger.write_to_log('', 'OPRT', 'upload', func_name, oprt_id, f"{local} ==> {remote}")
+    logger.write_to_log('', 'OPRT', 'upload', func_name, oprt_id, f"{local} ==> {get_global_dict_value(conn)}:{remote}")
     if conn:
         result = conn.sftp_upload(local, remote)
     else:
         cmd = f'cp -r {local} {remote}'
-        result = exec_cmd(cmd, logger)
+        result = exec_cmd(cmd)
     logger.write_to_log('', 'DATA', 'upload', func_name, oprt_id, result)
     return result
 
 
-def download_file(logger, remote, local, conn=None):
+def download_file(remote, local, conn=None):
+    logger = get_logger()
     oprt_id = log.create_oprt_id()
     func_name = traceback.extract_stack()[-2][2]
     logger.write_to_log('', 'DATA', 'STR', func_name, '', oprt_id)
-    logger.write_to_log('', 'OPRT', 'download', func_name, oprt_id, f"{remote} ==> {local}")
+    logger.write_to_log('', 'OPRT', 'download', func_name, oprt_id, f"{get_global_dict_value(conn)}:{remote} ==> {local}")
     if conn:
         result = conn.sftp_download(remote, local)
     else:
         cmd = f'cp -r {remote} {local}'
-        result = exec_cmd(cmd, logger)
+        result = exec_cmd(cmd)
     logger.write_to_log('', 'DATA', 'download', func_name, oprt_id, result)
     return result
 
@@ -141,9 +157,18 @@ def check_ip(ip):
 def _check_local(local):
     if not os.path.exists(local):
         try:
-            os.mkdir(local)
+            # 可多层创建目录
+            os.makedirs(local)
         except IOError as err:
             print(err)
+
+
+# def get_file_on_path(path, type):
+#     file_list = None
+#     if type == "dmesg":
+#         file_list = [log_file for log_file in os.listdir(path) if
+#                      log_file.endswith('.log') and log_file.startswith('dmesg')]
+#     return file_list
 
 
 def get_host_ip():
@@ -161,7 +186,8 @@ def get_host_ip():
     return ip
 
 
-def re_search(logger, re_string, tgt_string, output_type='bool'):
+def re_search(re_string, tgt_string, output_type='bool'):
+    logger = get_logger()
     oprt_id = log.create_oprt_id()
     re_obj = re.compile(re_string)
     re_result = re_obj.search(tgt_string)
@@ -177,7 +203,8 @@ def re_search(logger, re_string, tgt_string, output_type='bool'):
     return re_result
 
 
-def re_findall(logger, re_string, tgt_string):
+def re_findall(re_string, tgt_string):
+    logger = get_logger()
     oprt_id = log.create_oprt_id()
     re_obj = re.compile(re_string)
     logger.write_to_log(None, 'OPRT', 'REGULAR', 're_findall', oprt_id, {'re': re_string, 'string': tgt_string})
@@ -328,13 +355,20 @@ class SSHConn(object):
                     # print(a)
                     print(f"{command} finished....")
                     break
+            if len(stderr) > 0:
+                err = stderr.decode() if isinstance(stderr, bytes) else stderr
+                return {"st": False, "rt": err}
+            data = stdout.read()
+            if len(data) >= 0:
+                data = data.decode() if isinstance(data, bytes) else data
+                return {"st": True, "rt": data}
             return {"st": True, "rt": result}
 
 
 class ConfFile():
-    def __init__(self, file, logger):
+    def __init__(self, file):
         self.yaml_file = file
-        self.logger = logger
+        self.logger = get_logger()
         self.config = self.read_yaml()
 
     def read_yaml(self):
@@ -345,22 +379,22 @@ class ConfFile():
                 self.logger.write_to_log(None, "DATA", 'INPUT', 'yaml_file', self.yaml_file, yaml_dict)
             return yaml_dict
         except FileNotFoundError:
-            prt_log(self.logger, None, f"Please check the file name: {self.yaml_file}", 2)
+            prt_log(None, f"Please check the file name: {self.yaml_file}", 2)
         except TypeError:
-            prt_log(self.logger, None, "Error in the type of file name.", 2)
+            prt_log(None, "Error in the type of file name.", 2)
 
     @deco_yaml_dict
     def get_vplx_configs(self):
         for vplx_config in self.config["versaplx"]:
             if not check_ip(vplx_config['public_ip']):
-                prt_log(self.logger, None, f"Please check the config of {vplx_config['public_ip']}", 2)
+                prt_log(None, f"Please check the config of {vplx_config['public_ip']}", 2)
         return self.config["versaplx"]
 
     @deco_yaml_dict
     def get_test_mode(self):
         test_mode_list = ["quorum", "iscsi", "drbd_in_used"]
         if self.config["test_mode"] not in test_mode_list:
-            prt_log(self.logger, None, f"Please check whether the config of test_mode in {test_mode_list}", 2)
+            prt_log(None, f"Please check whether the config of test_mode in {test_mode_list}", 2)
         return self.config["test_mode"]
 
     @deco_yaml_dict
@@ -370,7 +404,7 @@ class ConfFile():
     @deco_yaml_dict
     def get_test_times(self):
         if not isinstance(self.config["test_times"], int):
-            prt_log(self.logger, None, "Please enter test_times of int type", 2)
+            prt_log(None, "Please enter test_times of int type", 2)
         return self.config["test_times"]
 
     @deco_yaml_dict
@@ -386,8 +420,8 @@ class ConfFile():
         return self.config["target"]
 
     @deco_yaml_dict
-    def get_crm_log_path(self):
-        return self.config["crm_log_path"]
+    def get_log_path(self):
+        return self.config["log_path"]
 
     @deco_yaml_dict
     def get_device(self):

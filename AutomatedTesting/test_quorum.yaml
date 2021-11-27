@@ -1,0 +1,30 @@
+test_mode: quorum
+use_case: 2
+test_times: 1
+resource_size: 800M
+log_path: /Users/loxoll/Downloads/kk/logfiles
+versaplx:
+- hostname: VersaPLX06
+  public_ip: 10.203.1.43
+  port: 22
+  password: password
+  private_ip:
+    device: bond0
+    ip: 192.168.8.43
+  lvm_device: vg0
+- hostname: VersaPLX07
+  public_ip: 10.203.1.45
+  port: 22
+  password: password
+  private_ip:
+    device: bond0
+    ip: 192.168.8.45
+  lvm_device: vg0
+- hostname: VersaPLX08
+  public_ip: 10.203.1.44
+  port: 22
+  password: password
+  private_ip:
+    device: bond0
+    ip: 192.168.8.44
+  lvm_device: vg1
