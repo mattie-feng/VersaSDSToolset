@@ -1,66 +1,49 @@
 import utils
-import subprocess
-import time
-import log
 
+
+# def dd_operation(device, conn=None):
+#     logger = utils.get_logger()
+#     oprt_id = log.create_oprt_id()
+#     logger.write_to_log(conn, 'DATA', 'STR', "dd_operation", '', oprt_id)
+#     cmd = f"dd if=/dev/urandom of={device} oflag=direct status=progress"
+#     if conn is None:
+#         logger.write_to_log(conn, 'OPRT', 'CMD', "dd_operation", oprt_id, cmd)
+#         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,
+#                              encoding="utf-8")  # 使用管道
+#         while p.poll() is None:
+#             print(p.stdout.readline())
+#             time.sleep(1)
+#         # p.kill()
+#         print(f"{cmd} finished....")
+#         logger.write_to_log(conn, 'DATA', 'CMD', "dd_operation", oprt_id, {"st": True, "rt": p.stdout.readline()})
+#     else:
+#         logger.write_to_log(conn, 'OPRT', 'CMD', "dd_operation", oprt_id, cmd)
+#         # result = conn.exec_cmd_and_print(cmd)
+#         result = conn.exec_cmd(cmd)
+#         # print(result['rt'])
+#         logger.write_to_log(conn, 'DATA', 'CMD', "dd_operation", oprt_id, result)
+#         # logger.write_to_log(conn, 'DATA', 'CMD', "dd_operation", oprt_id, {"st": True, "rt": result})
 
 class RWData(object):
     def __init__(self, conn=None):
         self.conn = conn
 
     def dd_operation(self, device):
-        logger = utils.get_logger()
-        oprt_id = log.create_oprt_id()
-        logger.write_to_log(self.conn, 'DATA', 'STR', "dd_operation", '', oprt_id)
         cmd = f"dd if=/dev/urandom of={device} oflag=direct status=progress"
-        if self.conn is None:
-            logger.write_to_log(self.conn, 'OPRT', 'CMD', "dd_operation", oprt_id, cmd)
-            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,
-                                 encoding="utf-8")  # 使用管道
-            while p.poll() is None:
-                print(p.stdout.readline())
-                time.sleep(1)
-            # p.kill()
-            print(f"{cmd} finished....")
-            logger.write_to_log(self.conn, 'DATA', 'CMD', "dd_operation", oprt_id,
-                                {"st": True, "rt": p.stdout.readline()})
-        else:
-            logger.write_to_log(self.conn, 'OPRT', 'CMD', "dd_operation", oprt_id, cmd)
-            # result = conn.exec_cmd_and_print(cmd)
-            result = self.conn.exec_cmd(cmd)
-            # print(result['rt'])
-            logger.write_to_log(self.conn, 'DATA', 'CMD', "dd_operation", oprt_id, result)
-            # logger.write_to_log(conn, 'DATA', 'CMD', "dd_operation", oprt_id, {"st": True, "rt": result})
+        utils.prt_log(self.conn, f"Start dd on {utils.get_global_dict_value(self.conn)}.", 0)
+        utils.exec_cmd(cmd, self.conn)
 
-
-def test_print():
-    while True:
-        print("a")
-        time.sleep(1)
-
-
-def dd_operation(device, conn=None):
-    logger = utils.get_logger()
-    oprt_id = log.create_oprt_id()
-    logger.write_to_log(conn, 'DATA', 'STR', "dd_operation", '', oprt_id)
-    cmd = f"dd if=/dev/urandom of={device} oflag=direct status=progress"
-    if conn is None:
-        logger.write_to_log(conn, 'OPRT', 'CMD', "dd_operation", oprt_id, cmd)
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,
-                             encoding="utf-8")  # 使用管道
-        while p.poll() is None:
-            print(p.stdout.readline())
-            time.sleep(1)
-        # p.kill()
-        print(f"{cmd} finished....")
-        logger.write_to_log(conn, 'DATA', 'CMD', "dd_operation", oprt_id, {"st": True, "rt": p.stdout.readline()})
-    else:
-        logger.write_to_log(conn, 'OPRT', 'CMD', "dd_operation", oprt_id, cmd)
-        # result = conn.exec_cmd_and_print(cmd)
-        result = conn.exec_cmd(cmd)
-        # print(result['rt'])
-        logger.write_to_log(conn, 'DATA', 'CMD', "dd_operation", oprt_id, result)
-        # logger.write_to_log(conn, 'DATA', 'CMD', "dd_operation", oprt_id, {"st": True, "rt": result})
+    def kill_dd(self, device):
+        cmd_ps = 'ps -ef | grep dd'
+        result = utils.exec_cmd(cmd_ps, self.conn)
+        re_string = f'\w*\s*(\d+)\s*.*dd if=/dev/urandom of={device} oflag=direct status=progress'
+        if result["st"]:
+            re_result = utils.re_search(re_string, result["rt"], "groups")
+            if re_result:
+                pid = re_result[0]
+                cmd_kill = f'kill -9 {pid}'
+                utils.exec_cmd(cmd_kill, self.conn)
+                utils.prt_log(self.conn, f"Kill dd on {utils.get_global_dict_value(self.conn)}.", 0)
 
 
 class IpService(object):
@@ -181,13 +164,8 @@ class Stor(object):
     def get_drbd_status(self, resource):
         cmd = f'drbdadm status {resource}'
         result = utils.exec_cmd(cmd, self.conn)
-        re_string = f'{resource}\s*role:(\w+).*\s*disk:(\w+)'
-        # re_peer_string = '\S+\s*role:(\w+).*\s*peer-disk:(\w+)'
         if result["st"]:
-            re_result = utils.re_search(re_string, result["rt"], "groups")
-            # re_peer_result = utils.re_findall( re_peer_string, result["rt"])
-            # return re_result, re_peer_result
-            return re_result
+            return result["rt"]
 
     def check_drbd_quorum(self, resource):
         cmd = f'drbdsetup show {resource}'

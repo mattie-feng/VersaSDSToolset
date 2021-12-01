@@ -1,5 +1,4 @@
 import sys
-import re
 import utils
 import action
 import gevent
@@ -8,48 +7,6 @@ import time
 from ssh_authorized import SSHAuthorizeNoMGN
 import ctypes
 import inspect
-import multiprocessing
-
-
-def run_multiprocessing_test_quorum(stor_a, stor_b, ip_a, conn_list, device, device_name, resource):
-    dd_a = action.RWData(conn_list[0])
-    dd_b = action.RWData(conn_list[1])
-    # mp1 = multiprocessing.Process(target=action.dd_operation,
-    #                               args=(device_name, conn_list[0]))
-    mp1 = multiprocessing.Process(target=dd_a.dd_operation,
-                                  args=(device_name,))
-    mp2 = multiprocessing.Process(target=ip_a.down_device, args=(device,))
-    # mp3 = multiprocessing.Process(target=action.dd_operation,
-    #                               args=(device_name, conn_list[1]))
-    mp3 = multiprocessing.Process(target=dd_b.dd_operation,
-                                  args=(device_name,))
-    mp4 = multiprocessing.Process(target=stor_a.secondary_drbd, args=(resource,))
-    print(multiprocessing.active_children())
-    mp1.start()
-    time.sleep(20)
-    mp2.start()
-    mp2.join()
-    print(multiprocessing.active_children())
-    time.sleep(3)
-    stor_b.primary_drbd(resource)
-    time.sleep(3)
-    mp3.start()
-    time.sleep(10)
-    mp4.start()
-    mp4.join()
-    print(multiprocessing.active_children())
-    mp1.join()
-    print(multiprocessing.active_children())
-    time.sleep(10)
-    if mp3.is_alive():
-        utils.prt_log(conn_list[1], f"Stop dd operation", 0)
-        mp3.terminate()
-        print(multiprocessing.active_children())
-    else:
-        print(multiprocessing.active_children())
-        utils.prt_log(conn_list[1], f"dd operation had been finished", 1)
-    mp3.join()
-    print(multiprocessing.active_children())
 
 
 def _async_raise(tid, exctype):
@@ -83,6 +40,18 @@ def get_crm_status_by_type(result, resource, type):
             re_string = "Failed Actions:\s*.*\*\s\w*\son\s(\S*)\s'(.*)'\s.*exitreason='(.*)',\s*.*"
             re_result = utils.re_search(re_string, result, "group")
             return re_result
+
+
+def ckeck_drbd_status_error(result, resource):
+    re_stand_alone = f'connection:StandAlone'
+    re_string = f'{resource}\s*role:(\w+).*\s*disk:(\w+)'
+    # re_peer_string = '\S+\s*role:(\w+).*\s*peer-disk:(\w+)'
+    if result:
+        re_stand_alone_result = utils.re_search(re_stand_alone, result, "bool")
+        if re_stand_alone_result:
+            return 'StandAlone'
+        re_result = utils.re_search(re_string, result, "groups")
+        return re_result
 
 
 class Connect(object):
@@ -123,35 +92,46 @@ class QuorumAutoTest(object):
         self.conn = Connect(self.config)
         self.vplx_configs = self.config.get_vplx_configs()
         self.node_list = [vplx_config["hostname"] for vplx_config in self.vplx_configs]
+        self.skip = False
 
-    def ssh_conn_build(self):
-        print("Start to build ssh connect")
-        ssh = SSHAuthorizeNoMGN()
-        ssh.init_cluster_no_mgn('versaplx', self.vplx_configs, self.conn.list_vplx_ssh)
+    # def ssh_conn_build(self):
+    #     print("Start to build ssh connect")
+    #     ssh = SSHAuthorizeNoMGN()
+    #     ssh.init_cluster_no_mgn('versaplx', self.vplx_configs, self.conn.list_vplx_ssh)
 
-    def install_software(self):
-        lst_update = []
-        lst_install_spc = []
-        lst_install_drbd = []
-        lst_install_linstor = []
-        for vplx_conn in self.conn.list_vplx_ssh:
-            install_obj = action.InstallSoftware(vplx_conn)
-            lst_update.append(gevent.spawn(install_obj.update_apt))
-            lst_install_spc.append(gevent.spawn(install_obj.install_spc))
-            lst_install_drbd.append(gevent.spawn(install_obj.install_drbd))
-            lst_install_linstor.append(
-                gevent.spawn(install_obj.install_software, "linstor-controller linstor-satellite linstor-client"))
-        gevent.joinall(lst_update)
-        gevent.joinall(lst_install_spc)
-        gevent.joinall(lst_install_drbd)
-        gevent.joinall(lst_install_linstor)
+    # def install_software(self):
+    #     lst_update = []
+    #     lst_install_spc = []
+    #     lst_install_drbd = []
+    #     lst_install_linstor = []
+    #     for vplx_conn in self.conn.list_vplx_ssh:
+    #         install_obj = action.InstallSoftware(vplx_conn)
+    #         lst_update.append(gevent.spawn(install_obj.update_apt))
+    #         lst_install_spc.append(gevent.spawn(install_obj.install_spc))
+    #         lst_install_drbd.append(gevent.spawn(install_obj.install_drbd))
+    #         lst_install_linstor.append(
+    #             gevent.spawn(install_obj.install_software, "linstor-controller linstor-satellite linstor-client"))
+    #     gevent.joinall(lst_update)
+    #     gevent.joinall(lst_install_spc)
+    #     gevent.joinall(lst_install_drbd)
+    #     gevent.joinall(lst_install_linstor)
+
+    def get_sp(self):
+        sp = "sp_quorum"
+        sp_list = []
+        for vplx_config in self.vplx_configs:
+            if "sp" in vplx_config.keys():
+                sp_list.append(vplx_config["sp"])
+        if len(sp_list) == 3 and len(set(sp_list)) == 1:
+            self.skip = True
+            sp = sp_list[0]
+        return sp
 
     def test_drbd_quorum(self):
-        sp = "pool1"
-        # sp = "sp_quorum"
-        resource = "res_quorum"
         if len(self.conn.list_vplx_ssh) != 3:
-            utils.prt_log(None, f"Please make sure there are three nodes for this test", 2)
+            utils.prt_log('', f"Please make sure there are three nodes for this test", 2)
+        sp = self.get_sp()
+        resource = "res_quorum"
         test_times = self.config.get_test_times()
         use_case = self.config.get_use_case()
 
@@ -162,7 +142,7 @@ class QuorumAutoTest(object):
         # utils.prt_log(None, f"Start to install software ...", 0)
         # self.install_software()
         install_obj = action.InstallSoftware(vtel_conn)
-        # install_obj.update_pip()
+        install_obj.update_pip()
         install_obj.install_vplx()
 
         self.create_linstor_resource(vtel_conn, sp, resource)
@@ -170,11 +150,11 @@ class QuorumAutoTest(object):
         stor_obj = action.Stor(vtel_conn)
 
         if not stor_obj.check_drbd_quorum(resource):
-            utils.prt_log(None, f"Abnormal quorum status of {resource}", 1)
+            utils.prt_log(vtel_conn, f'Abnormal quorum status of {resource}', 1)
             self.get_log()
             self.delete_linstor_resource(vtel_conn, sp, resource)
             return
-        if not self.ckeck_drbd_status(resource):
+        if not self.cycle_ckeck_drbd_status(resource):
             self.get_log()
             self.delete_linstor_resource(vtel_conn, sp, resource)
             return
@@ -185,142 +165,82 @@ class QuorumAutoTest(object):
         if use_case == 2:
             test_conn_list = [(self.conn.list_vplx_ssh[0], self.conn.list_vplx_ssh[1]),
                               (self.conn.list_vplx_ssh[2], self.conn.list_vplx_ssh[1])]
+            device_list.pop(1)
         for conn_list in test_conn_list:
-            times = utils.get_times() + 1
-            utils.set_times(times)
+            device = device_list.pop(0)
+            node_a = utils.get_global_dict_value(conn_list[0])
+            node_b = utils.get_global_dict_value(conn_list[1])
+            utils.prt_log('', f"\nMode:({node_a}, {node_b})", 0)
             for i in range(test_times):
-                print(f"Number of test times --- {times}")
+                times = utils.get_times() + 1
+                utils.set_times(times)
+                utils.prt_log('', f"\nMode test times: {i + 1}. Total test times: {times}.", 0)
                 stor_a = action.Stor(conn_list[0])
                 stor_b = action.Stor(conn_list[1])
                 ip_a = action.IpService(conn_list[0])
+                dd_a = action.RWData(conn_list[0])
+                dd_b = action.RWData(conn_list[1])
                 stor_a.primary_drbd(resource)
+                utils.prt_log(conn_list[0], f"Primary resource on {node_a} ...", 0)
                 time.sleep(3)
-                device = device_list.pop(0)
 
-                thread1 = threading.Thread(target=action.dd_operation,
-                                           args=(device_name, conn_list[0]), name="thread1")
+                thread1 = threading.Thread(target=dd_a.dd_operation,
+                                           args=(device_name,), name="thread1")
                 thread2 = threading.Thread(target=ip_a.down_device, args=(device,), name="thread2")
-                thread3 = threading.Thread(target=action.dd_operation,
-                                           args=(device_name, conn_list[1]), name="thread3")
+                thread3 = threading.Thread(target=dd_b.dd_operation,
+                                           args=(device_name,), name="thread3")
                 thread4 = threading.Thread(target=stor_a.secondary_drbd, args=(resource,), name="thread4")
-                print(threading.enumerate())
-                print(threading.activeCount())  # 4
                 thread1.start()
                 time.sleep(20)
-                print(threading.enumerate())
-                print(threading.activeCount())  # 5 thread1
                 thread2.start()
-                print(threading.enumerate())
-                print(threading.activeCount())  # 6 thread1,thread2
+                utils.prt_log(conn_list[0], f"Down {device} on {node_a}  ...", 0)
                 thread2.join()
-                print(threading.enumerate())
-                print(threading.activeCount())  # 5thread1,
                 time.sleep(3)
                 stor_b.primary_drbd(resource)
+                utils.prt_log(conn_list[0], f"Primary resource on {node_b} ...", 0)
                 time.sleep(3)
                 thread3.start()
-                print(threading.enumerate())
-                print(threading.activeCount())  # 6 thread1,thread3
                 time.sleep(10)
                 thread4.start()
-                print(threading.enumerate())
-                print(threading.activeCount())  # 6 thread1,thread3
+                utils.prt_log(conn_list[0], f"Secondary resource on {node_a} ...", 0)
                 thread4.join()
-                print(threading.enumerate())
-                print(threading.activeCount())  # 5 thread3
                 thread1.join()
-                print(threading.enumerate())
-                print(threading.activeCount())  # 5 thread3
                 time.sleep(10)
+                dd_b.kill_dd(device_name)
+                time.sleep(5)
                 if thread3.is_alive():
                     stop_thread(thread3)
                     time.sleep(5)
-                    utils.prt_log(conn_list[1], f"Stop dd operation", 0)
-                    print(threading.enumerate())
-                    print(threading.activeCount())  # 4
                 else:
-                    print(threading.enumerate())
-                    print(threading.activeCount())
                     utils.prt_log(conn_list[1], f"dd operation had been finished", 1)
                 thread3.join()
-                if thread3.is_alive():
-                    utils.prt_log(conn_list[1], f"thread3.is_alive2", 0)
-                    print(threading.activeCount())
-                print(threading.enumerate())
-                print(threading.activeCount())  # 4
-
-                # run_multiprocessing_test_quorum(stor_a, stor_b, ip_a, conn_list, device, device_name, resource)
-
                 ip_a.up_device(device)
+                utils.prt_log(conn_list[0], f"Up {device} on {node_a}  ...", 0)
                 ip_a.netplan_apply()
-                time.sleep(480)
-                if not self.ckeck_drbd_status(resource):
+                time.sleep(5)
+                if not self.cycle_ckeck_drbd_status(resource):
                     self.get_log()
                     stor_b.secondary_drbd(resource)
                     self.delete_linstor_resource(vtel_conn, sp, resource)
                     return
                 stor_b.secondary_drbd(resource)
+                utils.prt_log(conn_list[0], f"Secondary resource on {node_b} ...", 0)
+                time.sleep(180)
 
         self.delete_linstor_resource(vtel_conn, sp, resource)
-
-    def test_thread(self):
-        thread1 = threading.Thread(target=action.test_print, name="threadtest")
-        print(threading.enumerate())
-        print(threading.activeCount())  # 4
-        thread1.start()
-        print(threading.enumerate())
-        print(threading.activeCount())  # 5
-        time.sleep(4)
-        stop_thread(thread1)
-        time.sleep(5)
-        print(threading.enumerate())
-        print(threading.activeCount())  # 5
-        thread1.join()
-        print(threading.enumerate())
-        print(threading.activeCount())  # 4
-
-    # def dd_test(self, test_times, conn_list, resource, device_name):
-    #     device_list = [vplx_config["private_ip"]["device"] for vplx_config in self.vplx_configs]
-    #     for i in range(test_times):
-    #         stor_a = action.Stor(conn_list[0])
-    #         stor_b = action.Stor( conn_list[1])
-    #         ip_a = action.IpService( conn_list[0])
-    #         stor_a.primary_drbd(resource)
-    #         time.sleep(3)
-    #         device = device_list.pop(0)
-    #         thread1 = threading.Thread(target=action.dd_operation,
-    #                                    args=( device_name, conn_list[0]))
-    #         thread2 = threading.Thread(target=ip_a.down_device, args=(device,))
-    #         thread3 = threading.Thread(target=action.dd_operation,
-    #                                    args=( device_name, conn_list[1]))
-    #         thread1.start()
-    #         time.sleep(20)
-    #         thread2.start()
-    #         thread2.join()
-    #         # thread1.join()
-    #
-    #         stor_b.primary_drbd(resource)
-    #         thread3.start()
-    #         time.sleep(10)
-    #         stor_a.secondary_drbd(resource)
-    #         time.sleep(10)
-    #         stop_thread(thread3)
-    #         ip_a.up_device(device)
-    #         ip_a.netplan_apply()
-    #
-    #         stor_b.secondary_drbd(resource)
 
     def create_linstor_resource(self, conn, sp, resource):
         size = self.config.get_resource_size()
         use_case = self.config.get_use_case()
 
         stor_obj = action.Stor(conn)
-        # utils.prt_log(conn, f"Start to create node ...", 0)
-        # for vplx_config in self.vplx_configs:
-        #     stor_obj.create_node(vplx_config["hostname"], vplx_config["private_ip"]["ip"])
-        # utils.prt_log(conn, f"Start to create storagepool {sp} ...", 0)
-        # for vplx_config in self.vplx_configs:
-        #     stor_obj.create_sp(vplx_config["hostname"], sp, vplx_config["lvm_device"])
+        if not self.skip:
+            utils.prt_log(conn, f"Start to create node ...", 0)
+            for vplx_config in self.vplx_configs:
+                stor_obj.create_node(vplx_config["hostname"], vplx_config["private_ip"]["ip"])
+            utils.prt_log(conn, f"Start to create storagepool {sp} ...", 0)
+            for vplx_config in self.vplx_configs:
+                stor_obj.create_sp(vplx_config["hostname"], sp, vplx_config["lvm_device"])
         diskful_node_list = self.node_list[:]
         utils.prt_log(conn, f"Start to create resource {resource} ...", 0)
         if use_case == 1:
@@ -329,21 +249,21 @@ class QuorumAutoTest(object):
             stor_obj.create_diskless_resource(diskless_node, resource)
         if use_case == 2:
             stor_obj.create_diskful_resource(diskful_node_list, sp, size, resource)
-        time.sleep(180)
+        time.sleep(15)
 
     def delete_linstor_resource(self, conn, sp, resource):
         stor_obj = action.Stor(conn)
         utils.prt_log(conn, f"Start to delete resource {resource} ...", 0)
         stor_obj.delete_resource(resource)
         time.sleep(3)
-        # utils.prt_log(conn, f"Start to delete storagepool {sp} ...", 0)
-        # for node in self.node_list:
-        #     stor_obj.delete_sp(node, sp)
-        # time.sleep(3)
-        # utils.prt_log(conn, f"Start to delete node ...", 0)
-        # for node in self.node_list:
-        #     stor_obj.delete_node(node)
-        # time.sleep(3)
+        if not self.skip:
+            utils.prt_log(conn, f"Start to delete storagepool {sp} ...", 0)
+            for node in self.node_list:
+                stor_obj.delete_sp(node, sp)
+            time.sleep(3)
+            utils.prt_log(conn, f"Start to delete node ...", 0)
+            for node in self.node_list:
+                stor_obj.delete_node(node)
 
     def get_log(self):
         tmp_path = "/tmp/dmesg"
@@ -352,7 +272,7 @@ class QuorumAutoTest(object):
         lst_download = []
         lst_del_log = []
         log_path = self.config.get_log_path()
-        utils.prt_log(None, f"Start to collect dmesg file ...", 0)
+        utils.prt_log('', f"Start to collect dmesg file ...", 0)
         for conn in self.conn.list_vplx_ssh:
             debug_log = action.DebugLog(conn)
             lst_mkdir.append(gevent.spawn(debug_log.mkdir_dmesg_dir, tmp_path))
@@ -363,7 +283,7 @@ class QuorumAutoTest(object):
         gevent.joinall(lst_mkdir)
         gevent.joinall(lst_download)
         gevent.joinall(lst_mkdir)
-        utils.prt_log(None, f"Finished to collect dmesg file ...", 0)
+        utils.prt_log('', f"Finished to collect dmesg file ...", 0)
 
     def clean_dmesg(self):
         lst_clean_dmesg = []
@@ -373,49 +293,36 @@ class QuorumAutoTest(object):
         gevent.joinall(lst_clean_dmesg)
 
     def ckeck_drbd_status(self, resource):
-        # Primary Secondary
+        resource_status_list = []
         for vplx_conn in self.conn.list_vplx_ssh:
             stor_obj = action.Stor(vplx_conn)
-            resource_status = stor_obj.get_drbd_status(resource)
-            if resource_status[1] != "UpToDate" and resource_status[1] != "Diskless":
-                utils.prt_log(vplx_conn, f"Resource status is {resource_status[1]}", 1)
-                return False
-        return True
+            resource_status_result = stor_obj.get_drbd_status(resource)
+            resource_status = ckeck_drbd_status_error(resource_status_result, resource)
+            resource_status_list.append(resource_status)
+        return resource_status_list
 
-    def delete_res(self):
-        self.delete_linstor_resource(self.conn.list_vplx_ssh[0], "sp_quorum", "res_quorum")
-
-    def test_get_log(self):
-        # test collect log
-        self.get_log()
-
-    def ptint_mes(self):
-        while True:
-            print("a")
-
-    def test_multiprocessing(self):
-        for i in range(3):
-            print(i)
-            mp1 = multiprocessing.Process(target=self.ptint_mes)
-            mp1.start()
-            time.sleep(1)
-            mp1.terminate()
-            mp1.join()
-
-
-def ptint_mes():
-    while True:
-        print("a")
-
-
-def test_multiprocessing():
-    for i in range(3):
-        print(i)
-        mp1 = multiprocessing.Process(target=ptint_mes)
-        mp1.start()
-        time.sleep(1)
-        mp1.terminate()
-        mp1.join()
+    def cycle_ckeck_drbd_status(self, resource):
+        flag = False
+        for i in range(100):
+            flag = True
+            resource_status_list = self.ckeck_drbd_status(resource)
+            for resource_status in resource_status_list:
+                if resource_status == 'StandAlone':
+                    utils.prt_log('',
+                                  f'{time.strftime("%Y/%m/%d %H:%M:%S", time.localtime())} --- Connection is StandAlone',
+                                  0)
+                    return False
+                if resource_status[1] != "UpToDate" and resource_status[1] != "Diskless":
+                    # Inconsistent、Outdated
+                    status = resource_status[1]
+                    time.sleep(180)
+                    flag = False
+            if flag is True:
+                break
+        if flag is False:
+            utils.prt_log('', f'{time.strftime("%Y/%m/%d %H:%M:%S", time.localtime())} --- Resource status: {status}',
+                          0)
+        return flag
 
 
 class IscsiTest(object):
@@ -428,7 +335,7 @@ class IscsiTest(object):
     def test_drbd_in_used(self):
         start_time = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime())
         if len(self.conn.list_vplx_ssh) != 3:
-            utils.prt_log(None, f"Please make sure there are three nodes for this test", 2)
+            utils.prt_log('', f"Please make sure there are three nodes for this test", 2)
         test_times = self.config.get_test_times()
         device = self.config.get_device()
         target = self.config.get_target()
@@ -456,7 +363,7 @@ class IscsiTest(object):
             ip_obj.netplan_apply()
             time.sleep(30)
             self.restore_resource(resource)
-            utils.prt_log(None, f"Wait 10 minutes to restore the original environment", 0)
+            utils.prt_log('', f"Wait 10 minutes to restore the original environment", 0)
             time.sleep(600)
 
     def check_target_lun_status(self, target, resource, conn):
@@ -488,6 +395,7 @@ class IscsiTest(object):
         return True
 
     def ckeck_drbd_status(self, resource):
+        # TODO replace
         for vplx_conn in self.conn.list_vplx_ssh:
             stor_obj = action.Stor(vplx_conn)
             resource_status = stor_obj.get_drbd_status(resource)

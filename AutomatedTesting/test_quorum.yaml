@@ -12,6 +12,7 @@ versaplx:
     device: bond0
     ip: 192.168.8.43
   lvm_device: vg0
+  sp: pool1
 - hostname: VersaPLX07
   public_ip: 10.203.1.45
   port: 22
@@ -20,6 +21,7 @@ versaplx:
     device: bond0
     ip: 192.168.8.45
   lvm_device: vg0
+  sp: pool1
 - hostname: VersaPLX08
   public_ip: 10.203.1.44
   port: 22
@@ -28,3 +30,4 @@ versaplx:
     device: bond0
     ip: 192.168.8.44
   lvm_device: vg1
+  sp: pool1

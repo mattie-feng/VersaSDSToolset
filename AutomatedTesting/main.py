@@ -51,12 +51,7 @@ class AutomatedTesting():
         if test_mode == 'quorum':
             test_quorum = control.QuorumAutoTest(config)
             # test_quorum.ssh_conn_build()
-            # test_quorum.delete_res()
-            # test_quorum.test_thread()
             test_quorum.test_drbd_quorum()
-            # test_quorum.test_get_log()
-            # control.test_multiprocessing()
-            # test_quorum.test_multiprocessing()
         if test_mode == 'drbd_in_used':
             test_iscsi = control.IscsiTest(config)
             test_iscsi.test_drbd_in_used()

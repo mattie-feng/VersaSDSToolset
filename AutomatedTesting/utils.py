@@ -14,44 +14,44 @@ from stat import S_ISDIR as isdir
 
 
 def _init():  # 全局变量初始化
-    global _global_dict
-    _global_dict = {}
+    global _GLOBAL_DICT
+    _GLOBAL_DICT = {}
 
-    global _times
-    _times = 0
+    global _TIMES
+    _TIMES = 0
 
-    global _logger
-    _logger = None
+    global _LOGGER
+    _LOGGER = None
 
 
 def set_global_dict_value(key, value):
-    _global_dict[key] = value
+    _GLOBAL_DICT[key] = value
 
 
 def get_global_dict_value(key):
     try:
-        return _global_dict[key]
+        return _GLOBAL_DICT[key]
     except KeyError:
         # print("KeyError of global value.")
         return get_host_ip()
 
 
 def set_times(value):
-    global _times
-    _times = value
+    global _TIMES
+    _TIMES = value
 
 
 def get_times():
-    return _times
+    return _TIMES
 
 
 def set_logger(value):
-    global _logger
-    _logger = value
+    global _LOGGER
+    _LOGGER = value
 
 
 def get_logger():
-    return _logger
+    return _LOGGER
 
 
 def prt_log(conn, str_, warning_level):
@@ -132,7 +132,8 @@ def download_file(remote, local, conn=None):
     oprt_id = log.create_oprt_id()
     func_name = traceback.extract_stack()[-2][2]
     logger.write_to_log('', 'DATA', 'STR', func_name, '', oprt_id)
-    logger.write_to_log('', 'OPRT', 'download', func_name, oprt_id, f"{get_global_dict_value(conn)}:{remote} ==> {local}")
+    logger.write_to_log('', 'OPRT', 'download', func_name, oprt_id,
+                        f"{get_global_dict_value(conn)}:{remote} ==> {local}")
     if conn:
         result = conn.sftp_download(remote, local)
     else:
@@ -178,7 +179,7 @@ def get_host_ip():
     """
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 80))
+        s.connect(('8.8.8.8', 100))
         ip = s.getsockname()[0]
     finally:
         s.close()
@@ -231,7 +232,8 @@ class SSHConn(object):
             objSSHClient.connect(self._host, port=self._port,
                                  username=self._username,
                                  password=self._password,
-                                 timeout=self._timeout)
+                                 timeout=self._timeout,
+                                 allow_agent=False)
             # time.sleep(1)
             # objSSHClient.exec_command("\x003")
             self.SSHConnection = objSSHClient
@@ -247,6 +249,7 @@ class SSHConn(object):
                 sys.exit()
 
     def exec_cmd(self, command):
+        # TODO paramiko.ssh_exception.SSHException
         if self.SSHConnection:
             stdin, stdout, stderr = self.SSHConnection.exec_command(command)
             err = stderr.read()
@@ -365,7 +368,7 @@ class SSHConn(object):
             return {"st": True, "rt": result}
 
 
-class ConfFile():
+class ConfFile(object):
     def __init__(self, file):
         self.yaml_file = file
         self.logger = get_logger()
