@@ -9,43 +9,58 @@ import time
 import traceback
 from functools import wraps
 import log
+import os
+from stat import S_ISDIR as isdir
 
 
 def _init():  # 全局变量初始化
-    global _global_dict
-    _global_dict = {}
+    global _GLOBAL_DICT
+    _GLOBAL_DICT = {}
 
-    global _times
-    _times = 0
+    global _TIMES
+    _TIMES = 0
+
+    global _LOGGER
+    _LOGGER = None
 
 
 def set_global_dict_value(key, value):
-    _global_dict[key] = value
+    _GLOBAL_DICT[key] = value
 
 
 def get_global_dict_value(key):
     try:
-        return _global_dict[key]
+        return _GLOBAL_DICT[key]
     except KeyError:
         # print("KeyError of global value.")
         return get_host_ip()
 
 
 def set_times(value):
-    global _times
-    _times = value
+    global _TIMES
+    _TIMES = value
 
 
 def get_times():
-    return _times
+    return _TIMES
 
 
-def prt_log(logger, conn, str_, warning_level):
+def set_logger(value):
+    global _LOGGER
+    _LOGGER = value
+
+
+def get_logger():
+    return _LOGGER
+
+
+def prt_log(conn, str_, warning_level):
     """
     print, write to log and exit.
     :param logger: Logger object for logging
     :param print_str: Strings to be printed and recorded
     """
+    logger = get_logger()
     print(str(str_))
     if warning_level == 0:
         logger.write_to_log(conn, 'INFO', 'INFO', 'finish', 'output', str_)
@@ -70,13 +85,14 @@ def deco_yaml_dict(func):
             return result
         except Exception as e:
             self.logger.write_to_log(None, 'DATA', 'DEBUG', 'exception', '', str(traceback.format_exc()))
-            print(e)
+            print(f'Error:{e}')
             sys.exit()
 
     return wrapper
 
 
-def exec_cmd(cmd, logger, conn=None):
+def exec_cmd(cmd, conn=None):
+    logger = get_logger()
     oprt_id = log.create_oprt_id()
     func_name = traceback.extract_stack()[-2][2]
     logger.write_to_log(conn, 'DATA', 'STR', func_name, '', oprt_id)
@@ -96,6 +112,37 @@ def exec_cmd(cmd, logger, conn=None):
             return {"st": False, "rt": p.stderr}
 
 
+def upload_file(local, remote, conn=None):
+    logger = get_logger()
+    oprt_id = log.create_oprt_id()
+    func_name = traceback.extract_stack()[-2][2]
+    logger.write_to_log('', 'DATA', 'STR', func_name, '', oprt_id)
+    logger.write_to_log('', 'OPRT', 'upload', func_name, oprt_id, f"{local} ==> {get_global_dict_value(conn)}:{remote}")
+    if conn:
+        result = conn.sftp_upload(local, remote)
+    else:
+        cmd = f'cp -r {local} {remote}'
+        result = exec_cmd(cmd)
+    logger.write_to_log('', 'DATA', 'upload', func_name, oprt_id, result)
+    return result
+
+
+def download_file(remote, local, conn=None):
+    logger = get_logger()
+    oprt_id = log.create_oprt_id()
+    func_name = traceback.extract_stack()[-2][2]
+    logger.write_to_log('', 'DATA', 'STR', func_name, '', oprt_id)
+    logger.write_to_log('', 'OPRT', 'download', func_name, oprt_id,
+                        f"{get_global_dict_value(conn)}:{remote} ==> {local}")
+    if conn:
+        result = conn.sftp_download(remote, local)
+    else:
+        cmd = f'cp -r {remote} {local}'
+        result = exec_cmd(cmd)
+    logger.write_to_log('', 'DATA', 'download', func_name, oprt_id, result)
+    return result
+
+
 def check_ip(ip):
     """检查IP格式"""
     re_ip = re.compile(
@@ -108,6 +155,23 @@ def check_ip(ip):
         return False
 
 
+def _check_local(local):
+    if not os.path.exists(local):
+        try:
+            # 可多层创建目录
+            os.makedirs(local)
+        except IOError as err:
+            print(err)
+
+
+# def get_file_on_path(path, type):
+#     file_list = None
+#     if type == "dmesg":
+#         file_list = [log_file for log_file in os.listdir(path) if
+#                      log_file.endswith('.log') and log_file.startswith('dmesg')]
+#     return file_list
+
+
 def get_host_ip():
     """
     查询本机ip地址
@@ -115,7 +179,7 @@ def get_host_ip():
     """
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 80))
+        s.connect(('8.8.8.8', 100))
         ip = s.getsockname()[0]
     finally:
         s.close()
@@ -123,7 +187,8 @@ def get_host_ip():
     return ip
 
 
-def re_search(logger, re_string, tgt_string, output_type='bool'):
+def re_search(re_string, tgt_string, output_type='bool'):
+    logger = get_logger()
     oprt_id = log.create_oprt_id()
     re_obj = re.compile(re_string)
     re_result = re_obj.search(tgt_string)
@@ -139,7 +204,8 @@ def re_search(logger, re_string, tgt_string, output_type='bool'):
     return re_result
 
 
-def re_findall(logger, re_string, tgt_string):
+def re_findall(re_string, tgt_string):
+    logger = get_logger()
     oprt_id = log.create_oprt_id()
     re_obj = re.compile(re_string)
     logger.write_to_log(None, 'OPRT', 'REGULAR', 're_findall', oprt_id, {'re': re_string, 'string': tgt_string})
@@ -166,7 +232,8 @@ class SSHConn(object):
             objSSHClient.connect(self._host, port=self._port,
                                  username=self._username,
                                  password=self._password,
-                                 timeout=self._timeout)
+                                 timeout=self._timeout,
+                                 allow_agent=False)
             # time.sleep(1)
             # objSSHClient.exec_command("\x003")
             self.SSHConnection = objSSHClient
@@ -182,6 +249,7 @@ class SSHConn(object):
                 sys.exit()
 
     def exec_cmd(self, command):
+        # TODO paramiko.ssh_exception.SSHException
         if self.SSHConnection:
             stdin, stdout, stderr = self.SSHConnection.exec_command(command)
             err = stderr.read()
@@ -192,6 +260,89 @@ class SSHConn(object):
             if len(data) >= 0:
                 data = data.decode() if isinstance(data, bytes) else data
                 return {"st": True, "rt": data}
+
+    def sftp_upload(self, local, remote):
+        sf = paramiko.Transport((self._host, self._port))
+        sf.connect(username=self._username, password=self._password)
+        sftp = paramiko.SFTPClient.from_transport(sf)
+
+        def _is_exists(path, function):
+            path = path.replace('\\', '/')
+            try:
+                function(path)
+            except Exception as error:
+                return False
+            else:
+                return True
+
+        # 拷贝文件
+        def _copy(sftp, local, remote):
+            # 判断remote是否是目录
+            if _is_exists(remote, function=sftp.chdir):
+                # 是，获取local路径中的最后一个文件名拼接到remote中
+                filename = os.path.basename(os.path.normpath(local))
+                remote = os.path.join(remote, filename).replace('\\', '/')
+            # 如果local为目录
+            if os.path.isdir(local):
+                # 在远程创建相应的目录
+                _is_exists(remote, function=sftp.mkdir)
+                # 遍历local
+                for file in os.listdir(local):
+                    # 取得file的全路径
+                    localfile = os.path.join(local, file).replace('\\', '/')
+                    # 深度递归_copy()
+                    _copy(sftp=sftp, local=localfile, remote=remote)
+            # 如果local为文件
+            if os.path.isfile(local):
+                try:
+                    sftp.put(local, remote)
+                except Exception as error:
+                    print(error)
+                    return {"st": False, "rt": f"{error}"}
+
+        # 检查local
+        if not _is_exists(local, function=os.stat):
+            return {"st": False, "rt": f"{local}: No such file or directory in local"}
+        # 检查remote的父目录
+        remote_parent = os.path.dirname(os.path.normpath(remote))
+        if not _is_exists(remote_parent, function=sftp.chdir):
+            return {"st": False, "rt": f"{remote}: No such file or directory in remote"}
+        # 拷贝文件
+        _copy(sftp=sftp, local=local, remote=remote)
+        return {"st": True, "rt": f"{local} ==> {remote}"}
+
+    def sftp_download(self, remote, local):
+        sf = paramiko.Transport((self._host, self._port))
+        sf.connect(username=self._username, password=self._password)
+        sftp = paramiko.SFTPClient.from_transport(sf)
+        self.download(sftp, remote, local)
+        return {"st": True, "rt": f"{local} ==> {remote}"}
+
+    def download(self, sftp, remote, local):
+        # 检查远程文件是否存在
+        try:
+            result = sftp.stat(remote)
+        except IOError as err:
+            error = '[ERROR %s] %s: %s' % (err.errno, os.path.basename(os.path.normpath(remote)), err.strerror)
+            return {"st": False, "rt": error}
+        else:
+            # 判断远程文件是否为目录
+            if isdir(result.st_mode):
+                dirname = os.path.basename(os.path.normpath(remote))
+                local = os.path.join(local, dirname)
+                _check_local(local)
+                for file in sftp.listdir(remote):
+                    sub_remote = os.path.join(remote, file)
+                    sub_remote = sub_remote.replace('\\', '/')
+                    self.download(sftp, sub_remote, local)
+            else:
+                # 拷贝文件
+                if os.path.isdir(local):
+                    local = os.path.join(local, os.path.basename(remote))
+                try:
+                    sftp.get(remote, local)
+                except IOError as err:
+                    return {"st": False, "rt": err}
 
     def exec_cmd_and_print(self, command):
         result = ''
@@ -207,13 +358,20 @@ class SSHConn(object):
                     # print(a)
                     print(f"{command} finished....")
                     break
+            if len(stderr) > 0:
+                err = stderr.decode() if isinstance(stderr, bytes) else stderr
+                return {"st": False, "rt": err}
+            data = stdout.read()
+            if len(data) >= 0:
+                data = data.decode() if isinstance(data, bytes) else data
+                return {"st": True, "rt": data}
             return {"st": True, "rt": result}
 
 
-class ConfFile():
-    def __init__(self, file, logger):
+class ConfFile(object):
+    def __init__(self, file):
         self.yaml_file = file
-        self.logger = logger
+        self.logger = get_logger()
         self.config = self.read_yaml()
 
     def read_yaml(self):
@@ -224,22 +382,22 @@ class ConfFile():
                 self.logger.write_to_log(None, "DATA", 'INPUT', 'yaml_file', self.yaml_file, yaml_dict)
             return yaml_dict
         except FileNotFoundError:
-            prt_log(self.logger, None, f"Please check the file name: {self.yaml_file}", 2)
+            prt_log(None, f"Please check the file name: {self.yaml_file}", 2)
         except TypeError:
-            prt_log(self.logger, None, "Error in the type of file name.", 2)
+            prt_log(None, "Error in the type of file name.", 2)
 
     @deco_yaml_dict
     def get_vplx_configs(self):
         for vplx_config in self.config["versaplx"]:
             if not check_ip(vplx_config['public_ip']):
-                prt_log(self.logger, None, f"Please check the config of {vplx_config['public_ip']}", 2)
+                prt_log(None, f"Please check the config of {vplx_config['public_ip']}", 2)
         return self.config["versaplx"]
 
     @deco_yaml_dict
     def get_test_mode(self):
         test_mode_list = ["quorum", "iscsi", "drbd_in_used"]
         if self.config["test_mode"] not in test_mode_list:
-            prt_log(self.logger, None, f"Please check whether the config of test_mode in {test_mode_list}", 2)
+            prt_log(None, f"Please check whether the config of test_mode in {test_mode_list}", 2)
         return self.config["test_mode"]
 
     @deco_yaml_dict
@@ -249,7 +407,7 @@ class ConfFile():
     @deco_yaml_dict
     def get_test_times(self):
         if not isinstance(self.config["test_times"], int):
-            prt_log(self.logger, None, "Please enter test_times of int type", 2)
+            prt_log(None, "Please enter test_times of int type", 2)
         return self.config["test_times"]
 
     @deco_yaml_dict
@@ -265,8 +423,8 @@ class ConfFile():
         return self.config["target"]
 
     @deco_yaml_dict
-    def get_crm_log_path(self):
-        return self.config["crm_log_path"]
+    def get_log_path(self):
+        return self.config["log_path"]
 
     @deco_yaml_dict
     def get_device(self):
