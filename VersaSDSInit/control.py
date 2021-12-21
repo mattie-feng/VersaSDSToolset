@@ -90,7 +90,11 @@ class PacemakerConsole():
         lst = []
         single_interface = self.conn.cluster['single_heartbeat_line'] 
         cluster_name = self.conn.conf_file.get_cluster_name()
-        bindnetaddr = self.conn.conf_file.get_bindnetaddr()[0]
+        if single_interface:
+            bindnetaddr = self.conn.conf_file.get_bindnetaddr()[1]
+        else:
+            bindnetaddr = self.conn.conf_file.get_bindnetaddr()[0]
+
         interface = self.conn.conf_file.get_inferface()
         nodelist = self.conn.conf_file.get_nodelist(single_interface)
 

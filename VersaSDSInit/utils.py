@@ -181,7 +181,7 @@ class ConfFile():
 
         list_private_ip = node['private_ip']['ip'].split('.')
         bindnetaddr2 = f"{'.'.join(list_private_ip[:3])}.0"
-
+        
         return [bindnetaddr1,bindnetaddr2]
 
 

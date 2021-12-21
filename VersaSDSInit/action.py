@@ -113,15 +113,14 @@ class Corosync():
         # editor = utils.FileEdit(corosync_conf_path) # 读取原配置文件数据
         editor = utils.FileEdit(read_data)
 
-        editor.replace_data(f"cluster_name: {self.original_attr['cluster_name']}",
-                            f"cluster_name: {cluster_name}")
-        editor.insert_data(f'\trrp_mode: passive', anchor='        # also set rrp_mode.', type='under')
-        editor.replace_data(f"bindnetaddr: {self.original_attr['bindnetaddr']}",
-                            f"bindnetaddr: {bindnetaddr}")
+        editor.replace_data(f"cluster_name: {self.original_attr['cluster_name']}",f"cluster_name: {cluster_name}")
+        editor.replace_data(f"bindnetaddr: {self.original_attr['bindnetaddr']}",f"bindnetaddr: {bindnetaddr}")
 
         interface = utils.FileEdit.add_data_to_head(interface, '\t') # 缩进处理
         if not single_interface:
             editor.insert_data(interface,anchor=self.interface_pos,type='under')
+            editor.insert_data(f'\trrp_mode: passive', anchor='        # also set rrp_mode.', type='under')
+
         editor.insert_data(nodelist, anchor=self.nodelist_pos,type='above')
 
         # editor = utils.FileEdit(read_data) # 恢复原始配置文件，需要read_data存在
