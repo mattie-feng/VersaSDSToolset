@@ -74,25 +74,25 @@ class DebugLog(object):
         self.conn = conn
 
     def get_crm_report_file(self, time, path):
-        cmd = f'crm_report --from "{time}" {path}/crm_report_${{HOSTNAME}}_$(date +"%Y-%m-%d")_{utils.get_times()}.log'
+        cmd = f'crm_report --from "{time}" {path}/crm_report_${{HOSTNAME}}_$(date +"%Y-%m-%d-%H-%M")_{utils.get_times()}.log'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
             return True
 
     def get_dmesg_file(self, path):
         # 显示内核缓冲日志
-        cmd = f'dmesg -T | cat > {path}/dmesg_${{HOSTNAME}}_$(date +"%Y-%m-%d")_{utils.get_times()}.log'
+        cmd = f'dmesg -T | cat > {path}/dmesg_${{HOSTNAME}}_$(date +"%Y-%m-%d-%H-%M")_{utils.get_times()}.log'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
             return True
 
-    def mkdir_dmesg_dir(self, path):
+    def mkdir_log_dir(self, path):
         cmd = f'mkdir -p {path}'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
             return True
 
-    def rm_dmesg_dir(self, path):
+    def rm_log_dir(self, path):
         cmd = f'rm -rf {path}'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
@@ -237,6 +237,12 @@ class Stor(object):
         if result["st"]:
             re_result = utils.re_search(re_string, result["rt"], "group")
             return re_result
+
+    def get_linstor_res(self, resource):
+        cmd = f'linstor r l -r {resource} -p'
+        result = utils.exec_cmd(cmd, self.conn)
+        if result["st"]:
+            return result["rt"]
 
     def check_vtel_result(self, result):
         re_string = f'SUCCESS|successfully created'
