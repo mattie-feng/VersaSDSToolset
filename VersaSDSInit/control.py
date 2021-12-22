@@ -37,6 +37,7 @@ class Connect():
             else:
                 self.list_ssh.append(ssh.make_connect(node['public_ip'],node['port'],'root',node['root_password']))    
 
+
 class PacemakerConsole():
     def __init__(self):
         self.conn = Connect()
@@ -46,10 +47,6 @@ class PacemakerConsole():
         hosts_file = []
         for node in self.conn.cluster['node']:
             hosts_file.append({'ip': node['public_ip'], 'hostname': node['hostname']})
-
-        print(hosts_file)
-
-
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             executor = action.Host(ssh)
             lst.append(gevent.spawn(executor.modify_hostname, node['hostname']))
@@ -274,8 +271,7 @@ class PacemakerConsole():
             lst_up.append(gevent.spawn(ip_service.up_ip_service, node['private_ip']['device']))
         gevent.joinall(lst_up)
 
-
-
+    
 class LinstorConsole():
     def __init__(self):
         self.conn = Connect()
@@ -339,6 +335,8 @@ class LinstorConsole():
                 ha.backup_linstor(backup_path) # 要放置备份文件的路径（文件夹）
                 ha.move_database(backup_path)
                 ha.add_linstordb_to_pacemaker(len(self.conn.cluster['node']))
+            ha.modify_satelite_service()  # linstor satellite systemd 配置
+        
 
 
     def check_ha_controller(self,timeout=30):
@@ -389,7 +387,7 @@ class LinstorConsole():
             ha.secondary_drbd('linstordb')
             ha.delete_rd('linstordb') # 一般只需在一个节点上执行一次
             ha.remove_lv(list_lv)
-
+            
 
 class VersaSDSSoftConsole():
     def __init__(self):

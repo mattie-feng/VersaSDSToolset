@@ -148,8 +148,8 @@ class Corosync():
                     return True
 
 
-    def check_corosync_status(self,nodes,timeout=30):
-        cmd = 'crm st'
+    def check_corosync_status(self,nodes,timeout=60):
+        cmd = 'crm st | cat'
         t_beginning = time.time()
         node_online = []
         while not node_online:
@@ -241,9 +241,6 @@ class Pacemaker():
         cmd2 = 'crm config clone drbd-attr-clone drbd-attr'
         utils.exec_cmd(cmd1, self.conn)
         utils.exec_cmd(cmd2, self.conn)
-
-
-
 
 
 class TargetCLI():
@@ -401,6 +398,7 @@ class ServiceSet():
             return 'enable'
         else:
             return 'disable'
+
 
 
 class RA():
@@ -651,6 +649,16 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
     def secondary_drbd(self,drbd):
         cmd = f'drbdadm secondary {drbd}'
         utils.exec_cmd(cmd,self.conn)
+
+
+    # 配置linstor-satellite systemd，解决机器重启后 linstor not install 的报错问题
+    def modify_satelite_service(self):
+        satellite_conf = "/etc/systemd/system/multi-user.target.wants/linstor-satellite.service"
+        cmd = f"sed -i '7 a Environment=LS_KEEP_RES=linstordb' {satellite_conf}"
+        conf_data = utils.exec_cmd(f"cat {satellite_conf}",self.conn)
+        if not "Environment=LS_KEEP_RES=linstordb" in conf_data:
+            utils.exec_cmd(cmd,self.conn)
+
 
 
 class DRBD():
