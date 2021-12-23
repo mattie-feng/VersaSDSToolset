@@ -40,6 +40,10 @@ def get_crm_status_by_type(result, resource, type):
             re_string = "Failed Actions:\s*.*\*\s\w*\son\s(\S*)\s'(.*)'\s.*exitreason='(.*)',\s*.*"
             re_result = utils.re_search(re_string, result, "group")
             return re_result
+        if type == 'AllLUN':
+            re_string = f'(\S+)\s*\(ocf::heartbeat:iSCSILogicalUnit\):\s*(\w*)\s*(\w*)?'
+            re_result = utils.re_findall(re_string, result)
+            return re_result
 
 
 def ckeck_drbd_status_error(result, resource):
@@ -51,6 +55,13 @@ def ckeck_drbd_status_error(result, resource):
         if re_stand_alone_result:
             return 'StandAlone'
         re_result = utils.re_search(re_string, result, "groups")
+        return re_result
+
+
+def check_drbd_conns_status(result):
+    re_string = r'([a-zA-Z0-9_-]+).*\d+\s*\|\s*[a-zA-Z]*\s*\|\s*([a-zA-Z0-9()]*)\s*\|\s*([a-zA-Z]*)\s*\|'
+    if result:
+        re_result = utils.re_findall(re_string, result)
         return re_result
 
 
@@ -166,6 +177,7 @@ class QuorumAutoTest(object):
             test_conn_list = [(self.conn.list_vplx_ssh[0], self.conn.list_vplx_ssh[1]),
                               (self.conn.list_vplx_ssh[2], self.conn.list_vplx_ssh[1])]
             device_list.pop(1)
+        mode_times = 0
         for conn_list in test_conn_list:
             device = device_list.pop(0)
             node_a = utils.get_global_dict_value(conn_list[0])
@@ -225,6 +237,9 @@ class QuorumAutoTest(object):
                     return
                 stor_b.secondary_drbd(resource)
                 utils.prt_log(conn_list[0], f"Secondary resource on {node_b} ...", 0)
+                if times == mode_times * test_times + 1:
+                    self.get_log()
+                    mode_times = mode_times + 1
                 time.sleep(180)
 
         self.delete_linstor_resource(vtel_conn, sp, resource)
@@ -275,10 +290,10 @@ class QuorumAutoTest(object):
         utils.prt_log('', f"Start to collect dmesg file ...", 0)
         for conn in self.conn.list_vplx_ssh:
             debug_log = action.DebugLog(conn)
-            lst_mkdir.append(gevent.spawn(debug_log.mkdir_dmesg_dir, tmp_path))
+            lst_mkdir.append(gevent.spawn(debug_log.mkdir_log_dir, tmp_path))
             lst_get_log.append(gevent.spawn(debug_log.get_dmesg_file, tmp_path))
             lst_download.append(gevent.spawn(debug_log.download_log, tmp_path, log_path))
-            lst_del_log.append(gevent.spawn(debug_log.rm_dmesg_dir, tmp_path))
+            lst_del_log.append(gevent.spawn(debug_log.rm_log_dir, tmp_path))
         gevent.joinall(lst_get_log)
         gevent.joinall(lst_mkdir)
         gevent.joinall(lst_download)
@@ -313,7 +328,6 @@ class QuorumAutoTest(object):
                                   0)
                     return False
                 if resource_status[1] != "UpToDate" and resource_status[1] != "Diskless":
-                    # Inconsistent、Outdated
                     status = resource_status[1]
                     time.sleep(180)
                     flag = False
@@ -331,6 +345,7 @@ class IscsiTest(object):
         self.conn = Connect(self.config)
         self.vplx_configs = self.config.get_vplx_configs()
         self.node_list = [vplx_config["hostname"] for vplx_config in self.vplx_configs]
+        self.lun_list = []
 
     def test_drbd_in_used(self):
         start_time = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime())
@@ -341,6 +356,7 @@ class IscsiTest(object):
         target = self.config.get_target()
         resource = self.config.get_resource()
         ip_obj = action.IpService(self.conn.list_vplx_ssh[0])
+        ip_node = utils.get_global_dict_value(self.conn.list_vplx_ssh[0])
         for i in range(test_times):
             i = i + 1
             utils.set_times(i)
@@ -348,9 +364,11 @@ class IscsiTest(object):
             if not self.check_target_lun_status(target, resource,
                                                 self.conn.list_vplx_ssh[0]):
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
+                utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report and exit testing ...", 2)
             if not self.ckeck_drbd_status(resource):
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
-            utils.prt_log(self.conn.list_vplx_ssh[0], f"Down {device} ...", 0)
+                utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report and exit testing ...", 2)
+            utils.prt_log(self.conn.list_vplx_ssh[0], f"Down {device} on {ip_node} ...", 0)
             ip_obj.down_device(device)
             time.sleep(40)
             if not self.check_target_lun_status(target, resource, self.conn.list_vplx_ssh[1]):
@@ -358,22 +376,30 @@ class IscsiTest(object):
                 ip_obj.netplan_apply()
                 time.sleep(30)
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
-            utils.prt_log(self.conn.list_vplx_ssh[0], f"Up {device} ...", 0)
+                utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report and exit testing ...", 2)
+            utils.prt_log(self.conn.list_vplx_ssh[0], f"Up {device} on {ip_node} ...", 0)
             ip_obj.up_device(device)
             ip_obj.netplan_apply()
             time.sleep(30)
+            if not self.ckeck_drbd_status(resource):
+                self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
+                utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report and exit testing ...", 2)
             self.restore_resource(resource)
-            utils.prt_log('', f"Wait 10 minutes to restore the original environment", 0)
-            time.sleep(600)
+            if i == 1:
+                self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
+                utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report", 0)
+            utils.prt_log('', f"Wait 2 minutes to restore the original environment", 0)
+            time.sleep(120)
 
     def check_target_lun_status(self, target, resource, conn):
+        flag = True
+        tips = ''
         iscsi_obj = action.Iscsi(conn)
         crm_status = iscsi_obj.get_crm_status()
         error_message = get_crm_status_by_type(crm_status, None, "FailedActions")
         if error_message:
             print(error_message)
             return False
-        init_resource_status = get_crm_status_by_type(crm_status, resource, "iSCSILogicalUnit")
         init_target_status = get_crm_status_by_type(crm_status, target, "iSCSITarget")
         if init_target_status:
             if init_target_status[0] != 'Started':
@@ -382,27 +408,43 @@ class IscsiTest(object):
         else:
             utils.prt_log(conn, f"Can't get status of target {target}", 1)
             return False
-        if init_resource_status:
-            if init_resource_status[0] != 'Started':
-                utils.prt_log(conn, f"LUN status is {init_resource_status[0]}", 1)
+        all_resource_status = get_crm_status_by_type(crm_status, None, "AllLUN")
+        if all_resource_status:
+            self.lun_list.clear()
+            for status in all_resource_status:
+                self.lun_list.append(status[0])
+                if resource == status[0]:
+                    tips = '* '
+                    if not init_target_status[1] == status[2]:
+                        utils.prt_log(conn, f"Target and LUN is not started on the same node", 1)
+                        flag = False
+                if status[1] != 'Started':
+                    utils.prt_log(conn, f"{tips}{status[0]} status is {status[1]}", 1)
+                    flag = False
+            if not flag:
                 return False
         else:
-            utils.prt_log(conn, f"Can't get status of resource {resource}", 1)
-            return False
-        if not init_target_status[1] == init_resource_status[1]:
-            utils.prt_log(conn, f"Target and LUN is not started on the same node", 1)
+            utils.prt_log(conn, f"Can't get crm status", 1)
             return False
         return True
 
     def ckeck_drbd_status(self, resource):
-        # TODO replace
-        for vplx_conn in self.conn.list_vplx_ssh:
-            stor_obj = action.Stor(vplx_conn)
-            resource_status = stor_obj.get_drbd_status(resource)
-            if resource_status[1] != "UpToDate" and resource_status[1] != "Diskless":
-                utils.prt_log(vplx_conn, f"Resource status is {resource_status[1]}", 1)
-                return False
-        return True
+        flag = True
+        stor_obj = action.Stor(self.conn.list_vplx_ssh[1])
+        if self.lun_list:
+            all_lun_string = " ".join(self.lun_list)
+        else:
+            all_lun_string = resource
+        resource_status_result = stor_obj.get_linstor_res(all_lun_string)
+        resource_status = check_drbd_conns_status(resource_status_result)
+        for status in resource_status:
+            if status[1] != "Ok":
+                utils.prt_log(self.conn.list_vplx_ssh[1], f"Resource {status[0]} connection is {status[1]}", 1)
+                flag = False
+            if status[2] != "UpToDate" and status[2] != "Diskless":
+                utils.prt_log(self.conn.list_vplx_ssh[1], f"Resource {status[0]} status is {status[2]}", 1)
+                flag = False
+        return flag
 
     def restore_resource(self, resource):
         conn = self.conn.list_vplx_ssh[1]
@@ -424,8 +466,10 @@ class IscsiTest(object):
         iscsi_obj.unmove_res(resource)
 
     def collect_crm_report_file(self, time, conn):
+        tmp_path = "/tmp/crm_report"
         crm_log_path = self.config.get_log_path()
         debug_log = action.DebugLog(conn)
         utils.prt_log(conn, f"Start to collect crm_report...", 0)
-        debug_log.get_crm_report_file(time, crm_log_path)
-        utils.prt_log(conn, f"Finished to collect crm_report and exit testing ...", 2)
+        debug_log.get_crm_report_file(time, tmp_path)
+        debug_log.download_log(tmp_path, crm_log_path)
+        debug_log.rm_log_dir(tmp_path)

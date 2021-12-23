@@ -316,7 +316,7 @@ class SSHConn(object):
         sf.connect(username=self._username, password=self._password)
         sftp = paramiko.SFTPClient.from_transport(sf)
         self.download(sftp, remote, local)
-        return {"st": True, "rt": f"{local} ==> {remote}"}
+        return {"st": True, "rt": f"{remote} ==> {local}"}
 
     def download(self, sftp, remote, local):
         # 检查远程文件是否存在
