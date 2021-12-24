@@ -1,6 +1,7 @@
 import time
 import utils
 import re
+import os.path
 
 
 corosync_conf_path = '/etc/corosync/corosync.conf'
@@ -320,6 +321,7 @@ class ServiceSet():
 
 
     def set_enable_linstor_satellite(self):
+        utils.exec_cmd("rm /etc/systemd/system/multi-user.target.wants/linstor-satellite.service",self.conn)
         cmd = 'systemctl enable linstor-satellite'
         utils.exec_cmd(cmd,self.conn)
         time.sleep(0)
@@ -665,11 +667,28 @@ class DRBD():
     def __init__(self,conn=None):
         self.conn = conn
 
-    def install_spc(self):
+    def install_spc(self,times=3):
         cmd1 = 'apt install -y software-properties-common'
         cmd2 = 'add-apt-repository -y ppa:linbit/linbit-drbd9-stack'
         utils.exec_cmd(cmd1, self.conn)
         utils.exec_cmd(cmd2, self.conn)
+        while not self.is_exist_linbit_ppa():
+            if self.conn:
+                print(f'{self.conn._host}: 添加 linbit ppa 源失败，进行重试')
+            else:
+                print("localhost: 添加 linbit ppa 源失败，进行重试")
+            utils.exec_cmd(cmd1, self.conn)
+            utils.exec_cmd(cmd2, self.conn)
+            times-=1
+            if times <= 0:
+                return False
+        return True
+
+
+    def is_exist_linbit_ppa(self):
+        cmd = 'find /etc/apt/sources.list.d/ -name "linbit-ubuntu-linbit-drbd9-stack-bionic.list"'
+        if utils.exec_cmd(cmd,self.conn):
+            return True
 
     def apt_update(self):
         cmd = 'apt -y update'
