@@ -113,15 +113,14 @@ class Corosync():
         # editor = utils.FileEdit(corosync_conf_path) # 读取原配置文件数据
         editor = utils.FileEdit(read_data)
 
-        editor.replace_data(f"cluster_name: {self.original_attr['cluster_name']}",
-                            f"cluster_name: {cluster_name}")
-        editor.insert_data(f'\trrp_mode: passive', anchor='        # also set rrp_mode.', type='under')
-        editor.replace_data(f"bindnetaddr: {self.original_attr['bindnetaddr']}",
-                            f"bindnetaddr: {bindnetaddr}")
+        editor.replace_data(f"cluster_name: {self.original_attr['cluster_name']}",f"cluster_name: {cluster_name}")
+        editor.replace_data(f"bindnetaddr: {self.original_attr['bindnetaddr']}",f"bindnetaddr: {bindnetaddr}")
 
         interface = utils.FileEdit.add_data_to_head(interface, '\t') # 缩进处理
         if not single_interface:
             editor.insert_data(interface,anchor=self.interface_pos,type='under')
+            editor.insert_data(f'\trrp_mode: passive', anchor='        # also set rrp_mode.', type='under')
+
         editor.insert_data(nodelist, anchor=self.nodelist_pos,type='above')
 
         # editor = utils.FileEdit(read_data) # 恢复原始配置文件，需要read_data存在
@@ -149,8 +148,8 @@ class Corosync():
                     return True
 
 
-    def check_corosync_status(self,nodes,timeout=30):
-        cmd = 'crm st'
+    def check_corosync_status(self,nodes,timeout=60):
+        cmd = 'crm st | cat'
         t_beginning = time.time()
         node_online = []
         while not node_online:
@@ -242,9 +241,6 @@ class Pacemaker():
         cmd2 = 'crm config clone drbd-attr-clone drbd-attr'
         utils.exec_cmd(cmd1, self.conn)
         utils.exec_cmd(cmd2, self.conn)
-
-
-
 
 
 class TargetCLI():
@@ -402,6 +398,7 @@ class ServiceSet():
             return 'enable'
         else:
             return 'disable'
+
 
 
 class RA():
@@ -652,6 +649,16 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
     def secondary_drbd(self,drbd):
         cmd = f'drbdadm secondary {drbd}'
         utils.exec_cmd(cmd,self.conn)
+
+
+    # 配置linstor-satellite systemd，解决机器重启后 linstor not install 的报错问题
+    def modify_satelite_service(self):
+        satellite_conf = "/etc/systemd/system/multi-user.target.wants/linstor-satellite.service"
+        cmd = f"sed -i '7 a Environment=LS_KEEP_RES=linstordb' {satellite_conf}"
+        conf_data = utils.exec_cmd(f"cat {satellite_conf}",self.conn)
+        if not "Environment=LS_KEEP_RES=linstordb" in conf_data:
+            utils.exec_cmd(cmd,self.conn)
+
 
 
 class DRBD():
