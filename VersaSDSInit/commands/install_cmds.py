@@ -1,3 +1,4 @@
+import sys
 import control
 
 
@@ -31,7 +32,10 @@ class InstallCommands():
     def install_linbit(self,args):
         sc = control.VersaSDSSoftConsole()
         print('添加linbit-drbd库，并更新')
-        sc.install_spc()
+        result = sc.install_spc()
+        if not all(result):
+            print("添加linbit-drbd库失败，退出")
+            sys.exit(1)
         sc.apt_update()
         print('开始安装drbd相关软件')
         sc.install_drbd()

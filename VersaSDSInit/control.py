@@ -405,8 +405,10 @@ class VersaSDSSoftConsole():
         lst = []
         for ssh in self.conn.list_ssh:
             handler = action.DRBD(ssh)
-            lst.append(gevent.spawn(handler.install_spc))
+            lst.append(gevent.spawn(handler.install_spc))        
         gevent.joinall(lst)
+        result = [job.value for job in lst]
+        return result
 
 
     def install_drbd(self):
