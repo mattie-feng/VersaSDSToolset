@@ -2,6 +2,7 @@ import time
 import utils
 import re
 import os.path
+import timeout_decorator
 
 
 corosync_conf_path = '/etc/corosync/corosync.conf'
@@ -57,12 +58,10 @@ class Host():
         if lc_hostname == hostname:
             return True
 
-
     def check_ssh(self,cluster_hosts):
         # 1. 验证是否输入的host是否存在~/.ssh/authorized_keys这个文件
         # 2. 验证输入的hosts每个公钥最后的root@hostname, 是不是配置文件中都有记录
         ak_is_exist = bool(utils.exec_cmd('[ -f /root/.ssh/authorized_keys ] && echo True'))
-        time.sleep(0)
         if not ak_is_exist:
             return
         if not self._check_authorized_keys(cluster_hosts):
@@ -72,7 +71,6 @@ class Host():
 
     def _check_authorized_keys(self,cluster_hosts):
         authorized_keys = utils.exec_cmd('cat /root/.ssh/authorized_keys')
-        time.sleep(0)
         hosts = re.findall('ssh-rsa\s[\s\S]*?\sroot@(.*)', authorized_keys)
         if set(cluster_hosts) <= set(hosts):
             return True
@@ -107,7 +105,6 @@ class Corosync():
     def sync_time(self):
         cmd = 'ntpdate -u ntp.api.bz'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def change_corosync_conf(self,cluster_name,bindnetaddr,interface,nodelist,single_interface=False):
@@ -128,11 +125,10 @@ class Corosync():
         utils.exec_cmd(f'echo "{editor.data}" > {corosync_conf_path}',self.conn)
 
 
-
+    @timeout_decorator.timeout(30)
     def restart_corosync(self):
         cmd = 'systemctl restart corosync'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
 
@@ -182,22 +178,18 @@ class Pacemaker():
     def modify_cluster_name(self,cluster_name):
         cmd = f"crm config property cluster-name={cluster_name}"
         utils.exec_cmd(cmd, self.conn)
-        time.sleep(0)
 
     def modify_policy(self):
         cmd = "crm config property no-quorum-policy=ignore"
         utils.exec_cmd(cmd, self.conn)
-        time.sleep(0)
 
     def modify_stonith_enabled(self):
         cmd = "crm config property stonith-enabled=false"
         utils.exec_cmd(cmd, self.conn)
-        time.sleep(0)
 
     def modify_stickiness(self):
         cmd = "crm config rsc_defaults resource-stickiness=1000"
         utils.exec_cmd(cmd, self.conn)
-        time.sleep(0)
 
 
     def check_crm_conf(self,cluster_name):
@@ -251,18 +243,15 @@ class TargetCLI():
     def set_auto_add_default_portal(self):
         cmd = "targetcli set global auto_add_default_portal=false"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def set_auto_add_mapped_luns(self):
         cmd = "targetcli set global auto_add_mapped_luns=false"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
     def set_auto_enable_tpgt(self):
         cmd = "targetcli set global auto_enable_tpgt=true"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def check_targetcli_conf(self):
@@ -306,43 +295,36 @@ class ServiceSet():
     def set_disable_drbd(self):
         cmd = 'systemctl disable drbd'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def set_disable_linstor_controller(self):
         cmd = 'systemctl disable linstor-controller'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
     def set_disable_targetctl(self):
         cmd = 'systemctl disable rtslib-fb-targetctl'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def set_enable_linstor_satellite(self):
         utils.exec_cmd("rm /etc/systemd/system/multi-user.target.wants/linstor-satellite.service",self.conn)
         cmd = 'systemctl enable linstor-satellite'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def set_enable_pacemaker(self):
         cmd = 'systemctl enable pacemaker'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def set_enable_corosync(self):
         cmd = 'systemctl enable corosync'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def check_drbd(self):
         cmd = 'systemctl status drbd'
         data = utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
         result = re.findall('/systemd/system/drbd.service; disabled; vendor preset: enabled',data)
         if result:
             return 'disable'
@@ -353,7 +335,6 @@ class ServiceSet():
     def check_linstor_controller(self):
         cmd = 'systemctl status linstor-controller'
         data = utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
         result = re.findall('/systemd/system/linstor-controller.service; disabled; vendor preset: enabled',data)
         if result:
             return 'disable'
@@ -365,14 +346,12 @@ class ServiceSet():
     # def check_targetctl(self):
     #     cmd = 'systemctl status rtslib-fb-targetctl'
     #     data = utils.exec_cmd(cmd,self.conn)
-    #     time.sleep(0)
     #     if result:
     #         return True
 
     def check_linstor_satellite(self):
         cmd = 'systemctl status linstor-satellite'
         data = utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
         result = re.findall('/systemd/system/linstor-satellite.service; enabled; vendor preset: enabled',data)
         if result:
             return 'enable'
@@ -383,7 +362,6 @@ class ServiceSet():
     def check_pacemaker(self):
         cmd = 'systemctl status pacemaker'
         data = utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
         result = re.findall('/systemd/system/pacemaker.service; enabled; vendor preset: enabled',data)
         if result:
             return 'enable'
@@ -394,7 +372,6 @@ class ServiceSet():
     def check_corosync(self):
         cmd = 'systemctl status corosync'
         data = utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
         result = re.findall('/systemd/system/corosync.service; enabled; vendor preset: enabled',data)
         if result:
             return 'enable'
@@ -505,27 +482,22 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
     def create_rd(self,name):
         cmd = f"linstor resource-definition create {name}"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
     def create_vd(self,name,size):
         cmd = f"linstor volume-definition create {name} {size}"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
     def create_res(self,name,node,sp):
         cmd = f"linstor resource create {node} {name} --storage-pool {sp}"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
     def delete_rd(self,name):
         cmd = f"linstor rd d {name}"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
     def stop_controller(self):
         cmd = f"systemctl stop linstor-controller"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def backup_linstor(self,backup_path):
@@ -538,7 +510,6 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         if not bool(utils.exec_cmd(f'[ -d {backup_path} ] && echo True', self.conn)):
             utils.exec_cmd(f"mkdir -p {backup_path}")
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def get_controller(self):
@@ -568,7 +539,6 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         utils.exec_cmd(cmd_rm,self.conn)
         utils.exec_cmd(cmd_mount,self.conn)
         utils.exec_cmd(cmd_rsync,self.conn)
-        time.sleep(0)
 
 
     def add_linstordb_to_pacemaker(self,clone_max):
@@ -656,10 +626,10 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
     # 配置linstor-satellite systemd，解决机器重启后 linstor not install 的报错问题
     def modify_satelite_service(self):
         satellite_conf = "/etc/systemd/system/multi-user.target.wants/linstor-satellite.service"
-        cmd = f"sed -i '7 a Environment=LS_KEEP_RES=linstordb' {satellite_conf}"
         conf_data = utils.exec_cmd(f"cat {satellite_conf}",self.conn)
         if not "Environment=LS_KEEP_RES=linstordb" in conf_data:
-            utils.exec_cmd(cmd,self.conn)
+            utils.exec_cmd(f"echo '[Service]' >> {satellite_conf}", self.conn)
+            utils.exec_cmd(f"echo 'Environment=LS_KEEP_RES=linstordb' >> {satellite_conf}", self.conn)
 
 
 
