@@ -181,9 +181,10 @@ def get_host_ip():
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(('8.8.8.8', 100))
         ip = s.getsockname()[0]
+    except OSError:
+        ip = '0.0.0.0'
     finally:
         s.close()
-
     return ip
 
 
@@ -237,7 +238,9 @@ class SSHConn(object):
             # time.sleep(1)
             # objSSHClient.exec_command("\x003")
             self.SSHConnection = objSSHClient
-        except:
+        except paramiko.AuthenticationException:
+            print(f" Error SSH connection message of {self._host}")
+        except Exception as e:
             print(f" Failed to connect {self._host}")
 
     def ssh_connect(self):
@@ -250,16 +253,29 @@ class SSHConn(object):
 
     def exec_cmd(self, command):
         # TODO paramiko.ssh_exception.SSHException
-        if self.SSHConnection:
-            stdin, stdout, stderr = self.SSHConnection.exec_command(command)
-            err = stderr.read()
-            if len(err) > 0:
-                err = err.decode() if isinstance(err, bytes) else err
-                return {"st": False, "rt": err}
-            data = stdout.read()
-            if len(data) >= 0:
-                data = data.decode() if isinstance(data, bytes) else data
-                return {"st": True, "rt": data}
+        try:
+            if self.SSHConnection:
+                stdin, stdout, stderr = self.SSHConnection.exec_command(command)
+                err = stderr.read()
+                if len(err) > 0:
+                    err = err.decode() if isinstance(err, bytes) else err
+                    return {"st": False, "rt": err}
+                data = stdout.read()
+                if len(data) >= 0:
+                    data = data.decode() if isinstance(data, bytes) else data
+                    return {"st": True, "rt": data}
+            else:
+                print(f'Connect retry for {self._host}')
+                self._connect()
+        except paramiko.ssh_exception.SSHException:
+            print(f" SSHException. Connect retry for {self._host}")
+            self._connect()
+        except ConnectionResetError:
+            print(f" ConnectionResetError. Connect retry for {self._host}")
+            self._connect()
+        except TimeoutError:
+            print(f" TimeoutError. Connect retry for {self._host}")
+            self._connect()
 
     def sftp_upload(self, local, remote):
         sf = paramiko.Transport((self._host, self._port))
@@ -429,3 +445,7 @@ class ConfFile(object):
     @deco_yaml_dict
     def get_device(self):
         return self.config["device"]
+
+    @deco_yaml_dict
+    def get_email(self):
+        return self.config["email"]

@@ -7,6 +7,7 @@ import time
 from ssh_authorized import SSHAuthorizeNoMGN
 import ctypes
 import inspect
+import send_email as semail
 
 
 def _async_raise(tid, exctype):
@@ -100,6 +101,7 @@ class Connect(object):
 class QuorumAutoTest(object):
     def __init__(self, config):
         self.config = config
+        self.email = semail.Email(config)
         self.conn = Connect(self.config)
         self.vplx_configs = self.config.get_vplx_configs()
         self.node_list = [vplx_config["hostname"] for vplx_config in self.vplx_configs]
@@ -164,11 +166,11 @@ class QuorumAutoTest(object):
             utils.prt_log(vtel_conn, f'Abnormal quorum status of {resource}', 1)
             self.get_log()
             self.delete_linstor_resource(vtel_conn, sp, resource)
-            return
+            utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect dmesg and exit testing ...", 2)
         if not self.cycle_ckeck_drbd_status(resource):
             self.get_log()
             self.delete_linstor_resource(vtel_conn, sp, resource)
-            return
+            utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect dmesg and exit testing ...", 2)
         device_name = stor_obj.get_device_name(resource)
         device_list = [vplx_config["private_ip"]["device"] for vplx_config in self.vplx_configs]
         if use_case == 1:
@@ -234,7 +236,8 @@ class QuorumAutoTest(object):
                     self.get_log()
                     stor_b.secondary_drbd(resource)
                     self.delete_linstor_resource(vtel_conn, sp, resource)
-                    return
+                    self.email.send_autotest_mail()
+                    utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect dmesg and exit testing ...", 2)
                 stor_b.secondary_drbd(resource)
                 utils.prt_log(conn_list[0], f"Secondary resource on {node_b} ...", 0)
                 if times == mode_times * test_times + 1:
@@ -342,6 +345,7 @@ class QuorumAutoTest(object):
 class IscsiTest(object):
     def __init__(self, config):
         self.config = config
+        self.email = semail.Email(config)
         self.conn = Connect(self.config)
         self.vplx_configs = self.config.get_vplx_configs()
         self.node_list = [vplx_config["hostname"] for vplx_config in self.vplx_configs]
@@ -364,9 +368,11 @@ class IscsiTest(object):
             if not self.check_target_lun_status(target, resource,
                                                 self.conn.list_vplx_ssh[0]):
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
+                self.email.send_autotest_mail()
                 utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report and exit testing ...", 2)
             if not self.ckeck_drbd_status(resource):
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
+                self.email.send_autotest_mail()
                 utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report and exit testing ...", 2)
             utils.prt_log(self.conn.list_vplx_ssh[0], f"Down {device} on {ip_node} ...", 0)
             ip_obj.down_device(device)
@@ -376,6 +382,7 @@ class IscsiTest(object):
                 ip_obj.netplan_apply()
                 time.sleep(30)
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
+                self.email.send_autotest_mail()
                 utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report and exit testing ...", 2)
             utils.prt_log(self.conn.list_vplx_ssh[0], f"Up {device} on {ip_node} ...", 0)
             ip_obj.up_device(device)
@@ -383,6 +390,7 @@ class IscsiTest(object):
             time.sleep(30)
             if not self.ckeck_drbd_status(resource):
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
+                self.email.send_autotest_mail()
                 utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report and exit testing ...", 2)
             self.restore_resource(resource)
             if i == 1:
