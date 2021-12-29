@@ -1,3 +1,4 @@
+from re import T
 import time
 import sys
 
@@ -283,7 +284,7 @@ class LinstorConsole():
                 ha.backup_linstor(backup_path) # 要放置备份文件的路径（文件夹）
                 ha.move_database(backup_path)
                 ha.add_linstordb_to_pacemaker(len(self.conn.cluster['node']))
-            ha.modify_satelite_service()  # linstor satellite systemd 配置
+            ha.modify_satellite_service()  # linstor satellite systemd 配置
         
 
 
@@ -291,13 +292,27 @@ class LinstorConsole():
         ha = action.HALinstorController()
         node_list = [node['hostname'] for node in self.conn.cluster['node']]
         t_beginning = time.time()
+                
         while True:
             if ha.check_linstor_controller(node_list):
-                return True
+                break
             seconds_passed = time.time() - t_beginning
             if timeout and seconds_passed > timeout:
+                print("Linstor controller status error")
                 return False
             time.sleep(1)
+
+        for ssh in self.conn.list_ssh:
+            ha = action.HALinstorController(ssh)
+            service = action.ServiceSet(ssh)
+            if service.check_linstor_satellite() != 'enable':
+                print('LINSTOR Satellite Service is not "enable".')
+                return False
+            if not ha.check_satellite_settings():
+                print("File linstor-satellite.service modification failed" )
+                return False
+
+        return True
 
 
     def backup_linstordb(self,timeout=30):

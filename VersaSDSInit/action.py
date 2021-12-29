@@ -624,12 +624,28 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
 
 
     # 配置linstor-satellite systemd，解决机器重启后 linstor not install 的报错问题
-    def modify_satelite_service(self):
+    def modify_satellite_service(self):
         satellite_conf = "/etc/systemd/system/multi-user.target.wants/linstor-satellite.service"
         conf_data = utils.exec_cmd(f"cat {satellite_conf}",self.conn)
         if not "Environment=LS_KEEP_RES=linstordb" in conf_data:
             utils.exec_cmd(f"echo '[Service]' >> {satellite_conf}", self.conn)
             utils.exec_cmd(f"echo 'Environment=LS_KEEP_RES=linstordb' >> {satellite_conf}", self.conn)
+            utils.exec_cmd(f"systemctl daemon-reload",self.conn)
+            utils.exec_cmd(f"systemctl restart linstor-satellite", self.conn)
+
+    def check_satellite_settings(self):
+        # 配置文件检查
+        satellite_conf = "/etc/systemd/system/multi-user.target.wants/linstor-satellite.service"
+        conf_data = utils.exec_cmd(f"cat {satellite_conf}",self.conn)
+        if not "Environment=LS_KEEP_RES=linstordb" in conf_data:
+            return False
+
+        # symbolic link 检查
+        cmd_result = utils.exec_cmd("file /etc/systemd/system/multi-user.target.wants/linstor-satellite.service",self.conn)
+        if not "symbolic link to" in cmd_result:
+            return False
+        return True
+        
 
 
 
