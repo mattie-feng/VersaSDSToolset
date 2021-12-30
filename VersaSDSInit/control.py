@@ -122,8 +122,6 @@ class PacemakerConsole():
         packmaker.modify_stickiness()
         packmaker.modify_stonith_enabled()
 
-        self.conn.conf_file.cluster['cluster'] = cluster_name
-        self.conn.conf_file.update_yaml()
 
     def check_packmaker(self):
         cluster_name = self.conn.cluster['cluster']
