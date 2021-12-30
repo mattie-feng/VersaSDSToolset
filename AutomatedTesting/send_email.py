@@ -89,7 +89,7 @@ class Email(object):
         else:
             return
         send_smtp.close()
-        print("Send success!")
+        print("Send email success!")
 
     @email_switch
     def send_autotest_mail(self):

@@ -4,7 +4,6 @@ import action
 import gevent
 import threading
 import time
-from ssh_authorized import SSHAuthorizeNoMGN
 import ctypes
 import inspect
 import send_email as semail
@@ -47,7 +46,7 @@ def get_crm_status_by_type(result, resource, type):
             return re_result
 
 
-def ckeck_drbd_status_error(result, resource):
+def check_drbd_status(result, resource):
     re_stand_alone = f'connection:StandAlone'
     re_string = f'{resource}\s*role:(\w+).*\s*disk:(\w+)'
     # re_peer_string = '\S+\s*role:(\w+).*\s*peer-disk:(\w+)'
@@ -80,7 +79,6 @@ class Connect(object):
         return Connect._instance
 
     def get_ssh_conn(self):
-        ssh = SSHAuthorizeNoMGN()
         local_ip = utils.get_host_ip()
         vplx_configs = self.config.get_vplx_configs()
         username = "root"
@@ -92,7 +90,7 @@ class Connect(object):
                 self.list_vplx_ssh.append(None)
                 utils.set_global_dict_value(None, vplx_config['public_ip'])
             else:
-                ssh_conn = ssh.make_connect(vplx_config['public_ip'], vplx_config['port'], username,
+                ssh_conn = utils.SSHConn(vplx_config['public_ip'], vplx_config['port'], username,
                                             vplx_config['password'])
                 self.list_vplx_ssh.append(ssh_conn)
                 utils.set_global_dict_value(ssh_conn, vplx_config['public_ip'])
@@ -246,6 +244,7 @@ class QuorumAutoTest(object):
                 time.sleep(180)
 
         self.delete_linstor_resource(vtel_conn, sp, resource)
+        self.email.send_autotest_mail()
 
     def create_linstor_resource(self, conn, sp, resource):
         size = self.config.get_resource_size()
@@ -315,7 +314,7 @@ class QuorumAutoTest(object):
         for vplx_conn in self.conn.list_vplx_ssh:
             stor_obj = action.Stor(vplx_conn)
             resource_status_result = stor_obj.get_drbd_status(resource)
-            resource_status = ckeck_drbd_status_error(resource_status_result, resource)
+            resource_status = check_drbd_status(resource_status_result, resource)
             resource_status_list.append(resource_status)
         return resource_status_list
 
@@ -398,6 +397,7 @@ class IscsiTest(object):
                 utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report", 0)
             utils.prt_log('', f"Wait 2 minutes to restore the original environment", 0)
             time.sleep(120)
+        self.email.send_autotest_mail()
 
     def check_target_lun_status(self, target, resource, conn):
         flag = True

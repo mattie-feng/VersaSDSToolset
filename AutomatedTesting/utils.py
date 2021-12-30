@@ -51,6 +51,9 @@ def set_logger(value):
 
 
 def get_logger():
+    """
+    @rtype: object
+    """
     return _LOGGER
 
 
@@ -91,10 +94,39 @@ def deco_yaml_dict(func):
     return wrapper
 
 
+def handle_exception(func):
+    def re_connect(*args):
+        try:
+            return func(*args)
+        except paramiko.ssh_exception.SSHException:
+            time.sleep(1)
+            print(f" SSHException. Connect retry.")
+            args[1]._connect()
+            return func(*args)
+        except ConnectionResetError:
+            time.sleep(1)
+            print(f" ConnectionResetError. Connect retry.")
+            args[1]._connect()
+            return func(*args)
+        except TimeoutError:
+            time.sleep(1)
+            print(f" TimeoutError. Connect retry.")
+            args[1]._connect()
+            return func(*args)
+        except Exception as e:
+            time.sleep(1)
+            print(f" Exception: {e}. \nConnect retry.")
+            args[1]._connect()
+            return func(*args)
+
+    return re_connect
+
+
+@handle_exception
 def exec_cmd(cmd, conn=None):
     logger = get_logger()
     oprt_id = log.create_oprt_id()
-    func_name = traceback.extract_stack()[-2][2]
+    func_name = traceback.extract_stack()[-3][2]
     logger.write_to_log(conn, 'DATA', 'STR', func_name, '', oprt_id)
     logger.write_to_log(conn, 'OPRT', 'CMD', func_name, oprt_id, cmd)
     if conn:
@@ -252,30 +284,16 @@ class SSHConn(object):
                 sys.exit()
 
     def exec_cmd(self, command):
-        # TODO paramiko.ssh_exception.SSHException
-        try:
-            if self.SSHConnection:
-                stdin, stdout, stderr = self.SSHConnection.exec_command(command)
-                err = stderr.read()
-                if len(err) > 0:
-                    err = err.decode() if isinstance(err, bytes) else err
-                    return {"st": False, "rt": err}
-                data = stdout.read()
-                if len(data) >= 0:
-                    data = data.decode() if isinstance(data, bytes) else data
-                    return {"st": True, "rt": data}
-            else:
-                print(f'Connect retry for {self._host}')
-                self._connect()
-        except paramiko.ssh_exception.SSHException:
-            print(f" SSHException. Connect retry for {self._host}")
-            self._connect()
-        except ConnectionResetError:
-            print(f" ConnectionResetError. Connect retry for {self._host}")
-            self._connect()
-        except TimeoutError:
-            print(f" TimeoutError. Connect retry for {self._host}")
-            self._connect()
+        if self.SSHConnection:
+            stdin, stdout, stderr = self.SSHConnection.exec_command(command)
+            err = stderr.read()
+            if len(err) > 0:
+                err = err.decode() if isinstance(err, bytes) else err
+                return {"st": False, "rt": err}
+            data = stdout.read()
+            if len(data) >= 0:
+                data = data.decode() if isinstance(data, bytes) else data
+                return {"st": True, "rt": data}
 
     def sftp_upload(self, local, remote):
         sf = paramiko.Transport((self._host, self._port))
