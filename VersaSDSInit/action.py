@@ -1,6 +1,7 @@
 import time
 import utils
 import re
+import timeout_decorator
 
 
 corosync_conf_path = '/etc/corosync/corosync.conf'
@@ -56,12 +57,10 @@ class Host():
         if lc_hostname == hostname:
             return True
 
-
     def check_ssh(self,cluster_hosts):
         # 1. 验证是否输入的host是否存在~/.ssh/authorized_keys这个文件
         # 2. 验证输入的hosts每个公钥最后的root@hostname, 是不是配置文件中都有记录
         ak_is_exist = bool(utils.exec_cmd('[ -f /root/.ssh/authorized_keys ] && echo True'))
-        time.sleep(0)
         if not ak_is_exist:
             return
         if not self._check_authorized_keys(cluster_hosts):
@@ -71,7 +70,6 @@ class Host():
 
     def _check_authorized_keys(self,cluster_hosts):
         authorized_keys = utils.exec_cmd('cat /root/.ssh/authorized_keys')
-        time.sleep(0)
         hosts = re.findall('ssh-rsa\s[\s\S]*?\sroot@(.*)', authorized_keys)
         if set(cluster_hosts) <= set(hosts):
             return True
@@ -106,51 +104,50 @@ class Corosync():
     def sync_time(self):
         cmd = 'ntpdate -u ntp.api.bz'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
-    def change_corosync_conf(self,cluster_name,bindnetaddr,interface,nodelist,single_interface=False):
+    def change_corosync_conf(self,cluster_name,bindnetaddr_list,interface,nodelist):
         # editor = utils.FileEdit(corosync_conf_path) # 读取原配置文件数据
         editor = utils.FileEdit(read_data)
 
-        editor.replace_data(f"cluster_name: {self.original_attr['cluster_name']}",
-                            f"cluster_name: {cluster_name}")
-        editor.insert_data(f'\trrp_mode: passive', anchor='        # also set rrp_mode.', type='under')
-        editor.replace_data(f"bindnetaddr: {self.original_attr['bindnetaddr']}",
-                            f"bindnetaddr: {bindnetaddr}")
-
-        interface = utils.FileEdit.add_data_to_head(interface, '\t') # 缩进处理
-        if not single_interface:
-            editor.insert_data(interface,anchor=self.interface_pos,type='under')
+        editor.replace_data(f"cluster_name: {self.original_attr['cluster_name']}",f"cluster_name: {cluster_name}")
+        editor.replace_data(f"bindnetaddr: {self.original_attr['bindnetaddr']}",f"bindnetaddr: {bindnetaddr_list[0]}")
+        editor.insert_data(interface,anchor=self.interface_pos,type='under')
         editor.insert_data(nodelist, anchor=self.nodelist_pos,type='above')
-
+        if len(bindnetaddr_list) > 1:
+            editor.insert_data(f'\trrp_mode: passive', anchor='        # also set rrp_mode.', type='under')
         # editor = utils.FileEdit(read_data) # 恢复原始配置文件，需要read_data存在
         utils.exec_cmd(f'echo "{editor.data}" > {corosync_conf_path}',self.conn)
 
 
-
+    @timeout_decorator.timeout(30)
     def restart_corosync(self):
         cmd = 'systemctl restart corosync'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
 
-    def check_ring_status(self,node,single_interface=False):
+    def check_ring_status(self,node):
         cmd = 'corosync-cfgtool -s'
         data = utils.exec_cmd(cmd,self.conn)
         ring_data = re.findall('RING ID\s\d*[\s\S]*?id\s*=\s*(.*)',data)
-        if single_interface:
-            if node['private_ip']['ip'] in ring_data:
-                return True
-        else:
-            if len(ring_data) == 2:
-                if node['public_ip'] in ring_data and node['private_ip']['ip'] in ring_data:
-                    return True
+        for ip in node["heartbeat_line"]:
+            if not ip in ring_data:
+                return False
+        return True
+            
+    
+        # if single_interface:
+        #     if node['private_ip']['ip'] in ring_data:
+        #         return True
+        # else:
+        #     if len(ring_data) == 2:
+        #         if node['public_ip'] in ring_data and node['private_ip']['ip'] in ring_data:
+        #             return True
 
 
-    def check_corosync_status(self,nodes,timeout=30):
-        cmd = 'crm st'
+    def check_corosync_status(self,nodes,timeout=60):
+        cmd = 'crm st | cat'
         t_beginning = time.time()
         node_online = []
         while not node_online:
@@ -182,35 +179,32 @@ class Pacemaker():
     def modify_cluster_name(self,cluster_name):
         cmd = f"crm config property cluster-name={cluster_name}"
         utils.exec_cmd(cmd, self.conn)
-        time.sleep(0)
 
     def modify_policy(self):
         cmd = "crm config property no-quorum-policy=ignore"
         utils.exec_cmd(cmd, self.conn)
-        time.sleep(0)
 
     def modify_stonith_enabled(self):
         cmd = "crm config property stonith-enabled=false"
         utils.exec_cmd(cmd, self.conn)
-        time.sleep(0)
 
     def modify_stickiness(self):
         cmd = "crm config rsc_defaults resource-stickiness=1000"
         utils.exec_cmd(cmd, self.conn)
-        time.sleep(0)
 
 
-    def check_crm_conf(self,cluster_name):
+    def check_crm_conf(self):
         cmd = 'crm config show | cat'
         data = utils.exec_cmd(cmd,self.conn)
         data_property = re.search('property cib-bootstrap-options:\s([\s\S]*)',data).group(1)
-        re_cluster_name = re.findall('cluster-name=(\S*)', data_property)
+        # re_cluster_name = re.findall('cluster-name=(\S*)', data_property)
         re_stonith_enabled = re.findall('stonith-enabled=(\S*)', data_property)
         re_policy = re.findall('no-quorum-policy=(\S*)', data_property)
         re_resource_stickiness = re.findall('resource-stickiness=(\d*)', data)
 
-        if not re_cluster_name or re_cluster_name[0] != cluster_name:
-            return
+        # 不进行cluster_name 的判断
+        # if not re_cluster_name or re_cluster_name[0] != cluster_name:
+        #     return
 
         if not re_stonith_enabled or re_stonith_enabled[0] != 'false':
             return
@@ -244,7 +238,14 @@ class Pacemaker():
         utils.exec_cmd(cmd2, self.conn)
 
 
-
+    def clear(self):
+        utils.exec_cmd("crm res stop g_linstor p_fs_linstordb p_linstor-controller")
+        utils.exec_cmd("crm res stop ms_drbd_linstordb p_drbd_linstordb")
+        utils.exec_cmd("crm res stop drbd-attr")
+        time.sleep(2)
+        utils.exec_cmd("crm conf del g_linstor p_fs_linstordb p_linstor-controller")
+        utils.exec_cmd("crm conf del g_linstor ms_drbd_linstordb p_drbd_linstordb")
+        utils.exec_cmd("crm conf del drbd-attr")
 
 
 class TargetCLI():
@@ -254,18 +255,15 @@ class TargetCLI():
     def set_auto_add_default_portal(self):
         cmd = "targetcli set global auto_add_default_portal=false"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def set_auto_add_mapped_luns(self):
         cmd = "targetcli set global auto_add_mapped_luns=false"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
     def set_auto_enable_tpgt(self):
         cmd = "targetcli set global auto_enable_tpgt=true"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def check_targetcli_conf(self):
@@ -309,42 +307,36 @@ class ServiceSet():
     def set_disable_drbd(self):
         cmd = 'systemctl disable drbd'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def set_disable_linstor_controller(self):
         cmd = 'systemctl disable linstor-controller'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
     def set_disable_targetctl(self):
         cmd = 'systemctl disable rtslib-fb-targetctl'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def set_enable_linstor_satellite(self):
+        utils.exec_cmd("rm /etc/systemd/system/multi-user.target.wants/linstor-satellite.service",self.conn)
         cmd = 'systemctl enable linstor-satellite'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def set_enable_pacemaker(self):
         cmd = 'systemctl enable pacemaker'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def set_enable_corosync(self):
         cmd = 'systemctl enable corosync'
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def check_drbd(self):
         cmd = 'systemctl status drbd'
         data = utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
         result = re.findall('/systemd/system/drbd.service; disabled; vendor preset: enabled',data)
         if result:
             return 'disable'
@@ -355,7 +347,6 @@ class ServiceSet():
     def check_linstor_controller(self):
         cmd = 'systemctl status linstor-controller'
         data = utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
         result = re.findall('/systemd/system/linstor-controller.service; disabled; vendor preset: enabled',data)
         if result:
             return 'disable'
@@ -367,14 +358,12 @@ class ServiceSet():
     # def check_targetctl(self):
     #     cmd = 'systemctl status rtslib-fb-targetctl'
     #     data = utils.exec_cmd(cmd,self.conn)
-    #     time.sleep(0)
     #     if result:
     #         return True
 
     def check_linstor_satellite(self):
         cmd = 'systemctl status linstor-satellite'
         data = utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
         result = re.findall('/systemd/system/linstor-satellite.service; enabled; vendor preset: enabled',data)
         if result:
             return 'enable'
@@ -385,7 +374,6 @@ class ServiceSet():
     def check_pacemaker(self):
         cmd = 'systemctl status pacemaker'
         data = utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
         result = re.findall('/systemd/system/pacemaker.service; enabled; vendor preset: enabled',data)
         if result:
             return 'enable'
@@ -396,12 +384,14 @@ class ServiceSet():
     def check_corosync(self):
         cmd = 'systemctl status corosync'
         data = utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
         result = re.findall('/systemd/system/corosync.service; enabled; vendor preset: enabled',data)
         if result:
             return 'enable'
         else:
             return 'disable'
+
+
+
 
 
 class RA():
@@ -506,27 +496,22 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
     def create_rd(self,name):
         cmd = f"linstor resource-definition create {name}"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
     def create_vd(self,name,size):
         cmd = f"linstor volume-definition create {name} {size}"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
     def create_res(self,name,node,sp):
         cmd = f"linstor resource create {node} {name} --storage-pool {sp}"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
     def delete_rd(self,name):
         cmd = f"linstor rd d {name}"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
     def stop_controller(self):
         cmd = f"systemctl stop linstor-controller"
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def backup_linstor(self,backup_path):
@@ -539,7 +524,6 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         if not bool(utils.exec_cmd(f'[ -d {backup_path} ] && echo True', self.conn)):
             utils.exec_cmd(f"mkdir -p {backup_path}")
         utils.exec_cmd(cmd,self.conn)
-        time.sleep(0)
 
 
     def get_controller(self):
@@ -569,7 +553,6 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         utils.exec_cmd(cmd_rm,self.conn)
         utils.exec_cmd(cmd_mount,self.conn)
         utils.exec_cmd(cmd_rsync,self.conn)
-        time.sleep(0)
 
 
     def add_linstordb_to_pacemaker(self,clone_max):
@@ -654,15 +637,58 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         utils.exec_cmd(cmd,self.conn)
 
 
+    # 配置linstor-satellite systemd，解决机器重启后 linstor not install 的报错问题
+    def modify_satellite_service(self):
+        satellite_conf = "/etc/systemd/system/multi-user.target.wants/linstor-satellite.service"
+        conf_data = utils.exec_cmd(f"cat {satellite_conf}",self.conn)
+        if not "Environment=LS_KEEP_RES=linstordb" in conf_data:
+            utils.exec_cmd(f"echo '[Service]' >> {satellite_conf}", self.conn)
+            utils.exec_cmd(f"echo 'Environment=LS_KEEP_RES=linstordb' >> {satellite_conf}", self.conn)
+            utils.exec_cmd(f"systemctl daemon-reload",self.conn)
+            utils.exec_cmd(f"systemctl restart linstor-satellite", self.conn)
+
+    def check_satellite_settings(self):
+        # 配置文件检查
+        satellite_conf = "/etc/systemd/system/multi-user.target.wants/linstor-satellite.service"
+        conf_data = utils.exec_cmd(f"cat {satellite_conf}",self.conn)
+        if not "Environment=LS_KEEP_RES=linstordb" in conf_data:
+            return False
+
+        # symbolic link 检查
+        cmd_result = utils.exec_cmd("file /etc/systemd/system/multi-user.target.wants/linstor-satellite.service",self.conn)
+        if not "symbolic link to" in cmd_result:
+            return False
+        return True
+        
+
+
+
 class DRBD():
     def __init__(self,conn=None):
         self.conn = conn
 
-    def install_spc(self):
+    def install_spc(self,times=3):
         cmd1 = 'apt install -y software-properties-common'
         cmd2 = 'add-apt-repository -y ppa:linbit/linbit-drbd9-stack'
         utils.exec_cmd(cmd1, self.conn)
         utils.exec_cmd(cmd2, self.conn)
+        while not self.is_exist_linbit_ppa():
+            if self.conn:
+                print(f'{self.conn._host}: 添加 linbit ppa 源失败，进行重试')
+            else:
+                print("localhost: 添加 linbit ppa 源失败，进行重试")
+            utils.exec_cmd(cmd1, self.conn)
+            utils.exec_cmd(cmd2, self.conn)
+            times-=1
+            if times <= 0:
+                return False
+        return True
+
+
+    def is_exist_linbit_ppa(self):
+        cmd = 'find /etc/apt/sources.list.d/ -name "linbit-ubuntu-linbit-drbd9-stack-bionic.list"'
+        if utils.exec_cmd(cmd,self.conn):
+            return True
 
     def apt_update(self):
         cmd = 'apt -y update'
@@ -703,6 +729,10 @@ class Linstor():
             if timeout and seconds_passed > timeout:
                 return False
 
+    def restart_satellite(self):
+        cmd = "systemctl restart linstor-satellite"
+        utils.exec_cmd(cmd,self.conn)
+
     def create_node(self,node,ip):
         cmd = f'linstor node create {node} {ip}  --node-type Combined'
         utils.exec_cmd(cmd,self.conn)
@@ -725,6 +755,8 @@ class Linstor():
         version = re.findall('linstor (.*);',result)
         if version:
             return version[0]
+
+
 
 
 class LVM():
@@ -751,3 +783,6 @@ class LVM():
         cmd = 'apt install -y lvm2'
         utils.exec_cmd(cmd, self.conn)
 
+
+    def remove_vg0(self):
+        utils.exec_cmd("vgremove -y vg0",self.conn)

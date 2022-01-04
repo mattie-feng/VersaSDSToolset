@@ -1,18 +1,10 @@
-import gevent
-from gevent import monkey
+from re import T
 import time
 import sys
 
 from ssh_authorized import SSHAuthorizeNoMGN
 import utils
 import action
-
-
-# 协程相关的补丁
-monkey.patch_all()
-
-
-timeout = gevent.Timeout(60)
 
 
 class Connect():
@@ -37,84 +29,71 @@ class Connect():
             else:
                 self.list_ssh.append(ssh.make_connect(node['public_ip'],node['port'],'root',node['root_password']))    
 
+
 class PacemakerConsole():
     def __init__(self):
         self.conn = Connect()
 
     def modify_hostname(self):
-        lst = []
         hosts_file = []
         for node in self.conn.cluster['node']:
             hosts_file.append({'ip': node['public_ip'], 'hostname': node['hostname']})
-
-        print(hosts_file)
-
-
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             executor = action.Host(ssh)
-            lst.append(gevent.spawn(executor.modify_hostname, node['hostname']))
-            lst.append(gevent.spawn(executor.modify_hostsfile, '127.0.1.1', node['hostname']))
+            executor.modify_hostname(node['hostname'])
+            executor.modify_hostsfile('127.0.1.1', node['hostname'])
             for host in hosts_file:
-                lst.append(gevent.spawn(executor.modify_hostsfile, host['ip'], host['hostname']))
-
-        gevent.joinall(lst)
+                executor.modify_hostsfile(host['ip'], host['hostname'])
 
     def ssh_conn_build(self):
         ssh = SSHAuthorizeNoMGN()
         ssh.init_cluster_no_mgn('cluster', self.conn.cluster['node'], self.conn.list_ssh)
 
     def check_hostname(self):
-        lst = []
+        result_lst = []
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
-            lst.append(gevent.spawn(action.Host(ssh).check_hostname, node['hostname']))
-        gevent.joinall(lst)
-        result = [job.value for job in lst]
-        return result
+            result = action.Host(ssh).check_hostname(node['hostname'])
+            result_lst.append(result)
+        return result_lst
 
     def check_ssh_authorized(self):
-        lst = []
+        result_lst = []
         cluster_hosts = [node['hostname'] for node in self.conn.cluster['node']]
         for ssh in self.conn.list_ssh:
-            lst.append(gevent.spawn(action.Host(ssh).check_ssh, cluster_hosts))
-        gevent.joinall(lst)
-        result = [job.value for job in lst]
-        return result
+            result = action.Host(ssh).check_ssh(cluster_hosts)
+            result_lst.append(result)
+        return result_lst
 
     def sync_time(self):
-        lst = []
         for ssh in self.conn.list_ssh:
-            lst.append(gevent.spawn(action.Corosync(ssh).sync_time))
-        gevent.joinall(lst)
+            action.Corosync(ssh).sync_time()
 
     def corosync_conf_change(self):
-        lst = []
         single_interface = self.conn.cluster['single_heartbeat_line'] 
         cluster_name = self.conn.conf_file.get_cluster_name()
-        bindnetaddr = self.conn.conf_file.get_bindnetaddr()[0]
+        if single_interface:
+            bindnetaddr = self.conn.conf_file.get_bindnetaddr()[1]
+        else:
+            bindnetaddr = self.conn.conf_file.get_bindnetaddr()[0]
+
         interface = self.conn.conf_file.get_inferface()
         nodelist = self.conn.conf_file.get_nodelist(single_interface)
 
         for ssh in self.conn.list_ssh:
-            lst.append(gevent.spawn(action.Corosync(ssh).change_corosync_conf,
-                                    cluster_name,
-                                    bindnetaddr,
-                                    interface,
-                                    nodelist,
-                                    single_interface))
-
-        gevent.joinall(lst)
+            action.Corosync(ssh).change_corosync_conf(
+                cluster_name,
+                bindnetaddr,
+                interface,
+                nodelist,
+                single_interface
+            )
 
     def restart_corosync(self):
-        lst = []
-        timeout.start()
-        for ssh in self.conn.list_ssh:
-            lst.append(gevent.spawn(action.Corosync(ssh).restart_corosync))
         try:
-            gevent.joinall(lst)
-        except gevent.Timeout:
+            for ssh in self.conn.list_ssh:
+                action.Corosync(ssh).restart_corosync()
+        except timeout_decorator.timeout_decorator.TimeoutError.TimeoutError:
             print('Restarting corosync service timed out')
-        else:
-            timeout.close()
 
     def check_corosync(self):
         nodes = [node['hostname'] for node in self.conn.cluster['node']]
@@ -123,14 +102,12 @@ class PacemakerConsole():
         lst_cluster_status = []
         for ssh,node in zip(self.conn.list_ssh,self.conn.cluster['node']):
             corosync = action.Corosync(ssh)
-            lst_ring_status.append(gevent.spawn(corosync.check_ring_status,node,single_interface))
-            lst_cluster_status.append(gevent.spawn(corosync.check_corosync_status,nodes))
 
-        gevent.joinall(lst_ring_status)
-        gevent.joinall(lst_cluster_status)
+            lst_ring_status.append(corosync.check_ring_status(node,single_interface))
+            lst_cluster_status.append(corosync.check_corosync_status(nodes))
 
         lst = []
-        for x,y in zip([i.value for i in lst_ring_status],[i.value for i in lst_cluster_status]):
+        for x,y in zip(lst_ring_status,lst_cluster_status):
             if x and y:
                 lst.append(True)
             else:
@@ -140,16 +117,11 @@ class PacemakerConsole():
     def packmaker_conf_change(self):
         cluster_name = self.conn.conf_file.get_cluster_name()
         packmaker = action.Pacemaker()
+        packmaker.modify_cluster_name(cluster_name)
+        packmaker.modify_policy()
+        packmaker.modify_stickiness()
+        packmaker.modify_stonith_enabled()
 
-        lst = []
-        lst.append(gevent.spawn(packmaker.modify_cluster_name,cluster_name))
-        lst.append(gevent.spawn(packmaker.modify_policy))
-        lst.append(gevent.spawn(packmaker.modify_stickiness))
-        lst.append(gevent.spawn(packmaker.modify_stonith_enabled))
-
-        gevent.joinall(lst)
-        self.conn.conf_file.cluster['cluster'] = cluster_name
-        self.conn.conf_file.update_yaml()
 
     def check_packmaker(self):
         cluster_name = self.conn.cluster['cluster']
@@ -160,50 +132,41 @@ class PacemakerConsole():
             return [False] * len(self.conn.list_ssh)
 
     def targetcli_conf_change(self):
-        lst = []
         for ssh in self.conn.list_ssh:
             targetcli = action.TargetCLI(ssh)
-            lst.append(gevent.spawn(targetcli.set_auto_add_default_portal))
-            lst.append(gevent.spawn(targetcli.set_auto_add_mapped_luns))
-            lst.append(gevent.spawn(targetcli.set_auto_enable_tpgt))
+            targetcli.set_auto_add_default_portal()
+            targetcli.set_auto_add_mapped_luns()
+            targetcli.set_auto_enable_tpgt()
 
-        gevent.joinall(lst)
 
     def check_targetcli(self):
-        lst = []
+        result_lst = []
         for ssh in self.conn.list_ssh:
             targetcli = action.TargetCLI(ssh)
-            lst.append(gevent.spawn(targetcli.check_targetcli_conf))
-
-        gevent.joinall(lst)
-        result = [job.value for job in lst]
-        return result
+            result_lst.append(targetcli.check_targetcli_conf())
+        return result_lst
 
     def service_set(self):
-        lst = []
         for ssh in self.conn.list_ssh:
             executor = action.ServiceSet(ssh)
-            lst.append(gevent.spawn(executor.set_disable_drbd))
-            lst.append(gevent.spawn(executor.set_disable_linstor_controller))
-            lst.append(gevent.spawn(executor.set_disable_targetctl))
-            lst.append(gevent.spawn(executor.set_enable_linstor_satellite))
-            lst.append(gevent.spawn(executor.set_enable_pacemaker))
-            lst.append(gevent.spawn(executor.set_enable_corosync))
+            executor.set_disable_drbd()
+            executor.set_disable_linstor_controller()
+            executor.set_disable_targetctl()
+            executor.set_enable_linstor_satellite()
+            executor.set_enable_pacemaker()
+            executor.set_enable_corosync()
 
-        gevent.joinall(lst)
 
     def check_service(self):
         lst = []
         for ssh in self.conn.list_ssh:
             check_result = []
             executor = action.ServiceSet(ssh)
-            check_result.append(gevent.spawn(executor.check_drbd))
-            check_result.append(gevent.spawn(executor.check_linstor_controller))
-            check_result.append(gevent.spawn(executor.check_linstor_satellite))
-            check_result.append(gevent.spawn(executor.check_pacemaker))
-            check_result.append(gevent.spawn(executor.check_corosync))
-            gevent.joinall(check_result)
-            check_result = [job.value for job in check_result]
+            check_result.append(executor.check_drbd())
+            check_result.append(executor.check_linstor_controller())
+            check_result.append(executor.check_linstor_satellite())
+            check_result.append(executor.check_pacemaker())
+            check_result.append(executor.check_corosync())
             if check_result == ['disable','disable','enable','enable','enable']:
                 lst.append(True)
             else:
@@ -215,8 +178,8 @@ class PacemakerConsole():
         for ssh,node in zip(self.conn.list_ssh,self.conn.cluster['node']):
             executor = action.RA(ssh)
             lst = []
-            lst.append(gevent.spawn(executor.backup_iscsilogicalunit()))
-            lst.append(gevent.spawn(executor.backup_iscsitarget()))
+            lst.append(executor.backup_iscsilogicalunit())
+            lst.append(executor.backup_iscsitarget())
             if ssh:
                 other_node.append(node['hostname'])
 
@@ -232,10 +195,8 @@ class PacemakerConsole():
         for ssh in self.conn.list_ssh:
             check_result = []
             executor = action.RA(ssh)
-            check_result.append(gevent.spawn(executor.check_ra_target))
-            check_result.append(gevent.spawn(executor.check_ra_logicalunit))
-            gevent.joinall(check_result)
-            check_result = [job.value for job in check_result]
+            check_result.append(executor.check_ra_target())
+            check_result.append(executor.check_ra_logicalunit())
             if all(check_result):
                 lst.append(True)
             else:
@@ -245,21 +206,17 @@ class PacemakerConsole():
 
     def set_ip_on_device(self):
         lst_set = []
-
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             ip_service = action.IpService(ssh)
-            lst_set.append(gevent.spawn(ip_service.set_ip, node['private_ip']['device'], node['private_ip']['ip'], node['private_ip']['gateway']))
-        gevent.joinall(lst_set)
+            lst_set.append(ip_service.set_ip(node['private_ip']['device'], node['private_ip']['ip'], node['private_ip']['gateway']))
         self.up_ip_service()
         print("Finish to set ip")
 
     def modify_ip_on_device(self):
         lst_modify = []
-
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             ip_service = action.IpService(ssh)
-            lst_modify.append(gevent.spawn(ip_service.modify_ip, node['private_ip']['device'], node['private_ip']['ip'], node['private_ip']['gateway']))
-        gevent.joinall(lst_modify)
+            lst_modify.append(ip_service.modify_ip(node['private_ip']['device'], node['private_ip']['ip'], node['private_ip']['gateway']))
         self.up_ip_service()
         print("Finish to modify ip")
 
@@ -267,44 +224,36 @@ class PacemakerConsole():
         lst_up = []
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             ip_service = action.IpService(ssh)
-            lst_up.append(gevent.spawn(ip_service.up_ip_service, node['private_ip']['device']))
-        gevent.joinall(lst_up)
+            lst_up.append(ip_service.up_ip_service(node['private_ip']['device']))
 
-
-
+    
 class LinstorConsole():
     def __init__(self):
         self.conn = Connect()
 
     def create_conf_file(self):
         ips = ",".join([node['public_ip'] for node in self.conn.cluster['node']])
-        coroutine_list = []
         for ssh in self.conn.list_ssh:
             linstor = action.Linstor(ssh)
-            coroutine_list.append(gevent.spawn(linstor.create_conf(ips)))
-        gevent.joinall(coroutine_list)
+            linstor.create_conf(ips)
 
         if self.conn.list_ssh:
             action.Linstor(self.conn.list_ssh[0]).restart_controller()
 
     def create_nodes(self):
-        coroutine_list = []
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             linstor = action.Linstor(ssh)
-            coroutine_list.append(gevent.spawn(linstor.create_node,node['hostname'],node['public_ip']))
-        gevent.joinall(coroutine_list)
+            linstor.create_node(node['hostname'],node['public_ip'])
 
     def create_pools(self):
         # 待测试 以及确定thinlv创建时用到的lvm资源的格式。
-        coroutine_list = []
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             linstor = action.Linstor(ssh)
             vol = node['lvm_device'].split("/")
             if len(vol) == 1:
-                coroutine_list.append(gevent.spawn(linstor.create_lvm_sp,node['hostname'],node['lvm_device']))
+                linstor.create_lvm_sp(node['hostname'],node['lvm_device'])
             elif len(vol) == 2:
-                coroutine_list.append(gevent.spawn(linstor.create_lvmthin_sp,node['hostname'],node['lvm_device']))
-        gevent.joinall(coroutine_list)
+                linstor.create_lvmthin_sp(node['hostname'],node['lvm_device'])
 
     # HA controller配置
     def build_ha_controller(self):
@@ -322,11 +271,9 @@ class LinstorConsole():
             print('storage-pool：pool0 does not exist')
             sys.exit()
 
-        lst_res_create = []
         for node in self.conn.cluster['node']:
-            lst_res_create.append(gevent.spawn(ha.create_res,'linstordb',node['hostname'],'pool0'))
+            ha.create_res('linstordb',node['hostname'],'pool0')
 
-        gevent.joinall(lst_res_create)
 
         for ssh in self.conn.list_ssh:
             ha = action.HALinstorController(ssh)
@@ -335,19 +282,35 @@ class LinstorConsole():
                 ha.backup_linstor(backup_path) # 要放置备份文件的路径（文件夹）
                 ha.move_database(backup_path)
                 ha.add_linstordb_to_pacemaker(len(self.conn.cluster['node']))
+            ha.modify_satellite_service()  # linstor satellite systemd 配置
+        
 
 
     def check_ha_controller(self,timeout=30):
         ha = action.HALinstorController()
         node_list = [node['hostname'] for node in self.conn.cluster['node']]
         t_beginning = time.time()
+                
         while True:
             if ha.check_linstor_controller(node_list):
-                return True
+                break
             seconds_passed = time.time() - t_beginning
             if timeout and seconds_passed > timeout:
+                print("Linstor controller status error")
                 return False
             time.sleep(1)
+
+        for ssh in self.conn.list_ssh:
+            ha = action.HALinstorController(ssh)
+            service = action.ServiceSet(ssh)
+            if service.check_linstor_satellite() != 'enable':
+                print('LINSTOR Satellite Service is not "enable".')
+                return False
+            if not ha.check_satellite_settings():
+                print("File linstor-satellite.service modification failed" )
+                return False
+
+        return True
 
 
     def backup_linstordb(self,timeout=30):
@@ -385,83 +348,69 @@ class LinstorConsole():
             ha.secondary_drbd('linstordb')
             ha.delete_rd('linstordb') # 一般只需在一个节点上执行一次
             ha.remove_lv(list_lv)
-
+            
 
 class VersaSDSSoftConsole():
     def __init__(self):
         self.conn = Connect()
 
     def apt_update(self):
-        lst = []
         for ssh in self.conn.list_ssh:
             handler = action.DRBD(ssh)
-            lst.append(gevent.spawn(handler.apt_update))
-        gevent.joinall(lst)
+            handler.apt_update()
 
 
     def install_spc(self):
-        lst = []
+        result_lst = []
         for ssh in self.conn.list_ssh:
             handler = action.DRBD(ssh)
-            lst.append(gevent.spawn(handler.install_spc))
-        gevent.joinall(lst)
+            result_lst.append(handler.install_spc())
+        return result_lst
 
 
     def install_drbd(self):
-        lst = []
         for ssh in self.conn.list_ssh:
             handler = action.DRBD(ssh)
-            lst.append(gevent.spawn(handler.install_drbd))
-        gevent.joinall(lst)
+            handler.install_drbd()
+
 
 
     def install_linstor(self):
-        lst = []
         for ssh in self.conn.list_ssh:
             handler = action.Linstor(ssh)
-            lst.append(gevent.spawn(handler.install))
-        gevent.joinall(lst)
+            handler.install()
 
 
     def install_lvm2(self):
-        lst = []
         for ssh in self.conn.list_ssh:
             handler = action.LVM(ssh)
-            lst.append(gevent.spawn(handler.install))
-        gevent.joinall(lst)
-
+            handler.install()
 
     def install_pacemaker(self):
-        lst = []
         for ssh in self.conn.list_ssh:
             handler = action.Pacemaker(ssh)
-            lst.append(gevent.spawn(handler.install))
-        gevent.joinall(lst)
+            handler.install()
 
 
     def install_targetcli(self):
-        lst = []
         for ssh in self.conn.list_ssh:
             handler = action.TargetCLI(ssh)
-            lst.append(gevent.spawn(handler.install))
-        gevent.joinall(lst)
+            handler.install()
 
 
 
     def get_all_service_status(self):
-        lst = []
+        result = []
         for ssh in self.conn.list_ssh:
             service = action.ServiceSet(ssh)
             host = action.Host(ssh)
-            lst.append(gevent.spawn(host.get_hostname))
-            lst.append(gevent.spawn(service.check_pacemaker))
-            lst.append(gevent.spawn(service.check_corosync))
-            lst.append(gevent.spawn(service.check_linstor_satellite))
-            lst.append(gevent.spawn(service.check_drbd))
-            lst.append(gevent.spawn(service.check_linstor_controller))
+            result.append(host.get_hostname())
+            result.append(service.check_pacemaker())
+            result.append(service.check_corosync())
+            result.append(service.check_linstor_satellite())
+            result.append(service.check_drbd())
+            result.append(service.check_linstor_controller())
 
-        gevent.joinall(lst)
-        result = [job.value for job in lst]
         for i in range(0,len(result),6):
             yield result[i:i+6]
 
@@ -473,33 +422,31 @@ class VersaSDSSoftConsole():
         :param args:
         :return:
         """
-        coroutine_list = []
+        result = []
         for ssh in self.conn.list_ssh:
             host = action.Host(ssh)
-            coroutine_list.append(gevent.spawn(host.get_hostname))
+            result.append(host.get_hostname())
             for soft in args:
                 if soft == 'sysos':
-                    coroutine_list.append(gevent.spawn(host.get_sys_version))
+                    result.append(host.get_sys_version())
                 elif soft == 'syskernel':
-                    coroutine_list.append(gevent.spawn(host.get_kernel_version))
+                    result.append(host.get_kernel_version())
                 elif soft == 'drbd':
                     drbd = action.DRBD(ssh)
-                    coroutine_list.append(gevent.spawn(drbd.get_version))
+                    result.append(drbd.get_version())
                 elif soft == 'linstor':
                     linstor = action.Linstor(ssh)
-                    coroutine_list.append(gevent.spawn(linstor.get_version))
+                    result.append(linstor.get_version())
                 elif soft == 'targetcli':
                     targetcli = action.TargetCLI(ssh)
-                    coroutine_list.append(gevent.spawn(targetcli.get_version))
+                    result.append(targetcli.get_version())
                 elif soft == 'pacemaker':
                     pacemaker = action.Pacemaker(ssh)
-                    coroutine_list.append(gevent.spawn(pacemaker.get_version))
+                    result.append(pacemaker.get_version())
                 elif soft == 'corosync':
                     corosync = action.Corosync(ssh)
-                    coroutine_list.append(gevent.spawn(corosync.get_version))
+                    result.append(corosync.get_version())
 
-        gevent.joinall(coroutine_list)
-        result = [job.value for job in coroutine_list]
         for i in range(0,len(result),len(args)+1):
             yield result[i:i+len(args)+1]
 
@@ -512,9 +459,7 @@ class LVMConsole():
         pv_list = []
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             lvm = action.LVM(ssh)
-            pv_list.append(gevent.spawn(lvm.pv_create,node['pool_disk']))
-        gevent.joinall(pv_list)
-        pv_list = [job.value for job in pv_list]
+            pv_list.append(lvm.pv_create(node['pool_disk']))
         for r,node in zip(pv_list,self.conn.cluster['node']):
             if not r:
                 print(f"{node['pool_disk']} is not on {node['hostname']}")

@@ -51,6 +51,9 @@ def set_logger(value):
 
 
 def get_logger():
+    """
+    @rtype: object
+    """
     return _LOGGER
 
 
@@ -91,10 +94,39 @@ def deco_yaml_dict(func):
     return wrapper
 
 
+def handle_exception(func):
+    def re_connect(*args):
+        try:
+            return func(*args)
+        except paramiko.ssh_exception.SSHException:
+            time.sleep(1)
+            print(f" SSHException. Connect retry.")
+            args[1]._connect()
+            return func(*args)
+        except ConnectionResetError:
+            time.sleep(1)
+            print(f" ConnectionResetError. Connect retry.")
+            args[1]._connect()
+            return func(*args)
+        except TimeoutError:
+            time.sleep(1)
+            print(f" TimeoutError. Connect retry.")
+            args[1]._connect()
+            return func(*args)
+        except Exception as e:
+            time.sleep(1)
+            print(f" Exception: {e}. \nConnect retry.")
+            args[1]._connect()
+            return func(*args)
+
+    return re_connect
+
+
+@handle_exception
 def exec_cmd(cmd, conn=None):
     logger = get_logger()
     oprt_id = log.create_oprt_id()
-    func_name = traceback.extract_stack()[-2][2]
+    func_name = traceback.extract_stack()[-3][2]
     logger.write_to_log(conn, 'DATA', 'STR', func_name, '', oprt_id)
     logger.write_to_log(conn, 'OPRT', 'CMD', func_name, oprt_id, cmd)
     if conn:
@@ -181,9 +213,10 @@ def get_host_ip():
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(('8.8.8.8', 100))
         ip = s.getsockname()[0]
+    except OSError:
+        ip = '0.0.0.0'
     finally:
         s.close()
-
     return ip
 
 
@@ -237,7 +270,9 @@ class SSHConn(object):
             # time.sleep(1)
             # objSSHClient.exec_command("\x003")
             self.SSHConnection = objSSHClient
-        except:
+        except paramiko.AuthenticationException:
+            print(f" Error SSH connection message of {self._host}")
+        except Exception as e:
             print(f" Failed to connect {self._host}")
 
     def ssh_connect(self):
@@ -249,7 +284,6 @@ class SSHConn(object):
                 sys.exit()
 
     def exec_cmd(self, command):
-        # TODO paramiko.ssh_exception.SSHException
         if self.SSHConnection:
             stdin, stdout, stderr = self.SSHConnection.exec_command(command)
             err = stderr.read()
@@ -429,3 +463,7 @@ class ConfFile(object):
     @deco_yaml_dict
     def get_device(self):
         return self.config["device"]
+
+    @deco_yaml_dict
+    def get_email(self):
+        return self.config["email"]
