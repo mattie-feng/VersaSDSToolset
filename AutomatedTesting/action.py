@@ -1,29 +1,6 @@
 import utils
 
 
-# def dd_operation(device, conn=None):
-#     logger = utils.get_logger()
-#     oprt_id = log.create_oprt_id()
-#     logger.write_to_log(conn, 'DATA', 'STR', "dd_operation", '', oprt_id)
-#     cmd = f"dd if=/dev/urandom of={device} oflag=direct status=progress"
-#     if conn is None:
-#         logger.write_to_log(conn, 'OPRT', 'CMD', "dd_operation", oprt_id, cmd)
-#         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True,
-#                              encoding="utf-8")  # 使用管道
-#         while p.poll() is None:
-#             print(p.stdout.readline())
-#             time.sleep(1)
-#         # p.kill()
-#         print(f"{cmd} finished....")
-#         logger.write_to_log(conn, 'DATA', 'CMD', "dd_operation", oprt_id, {"st": True, "rt": p.stdout.readline()})
-#     else:
-#         logger.write_to_log(conn, 'OPRT', 'CMD', "dd_operation", oprt_id, cmd)
-#         # result = conn.exec_cmd_and_print(cmd)
-#         result = conn.exec_cmd(cmd)
-#         # print(result['rt'])
-#         logger.write_to_log(conn, 'DATA', 'CMD', "dd_operation", oprt_id, result)
-#         # logger.write_to_log(conn, 'DATA', 'CMD', "dd_operation", oprt_id, {"st": True, "rt": result})
-
 class RWData(object):
     def __init__(self, conn=None):
         self.conn = conn
