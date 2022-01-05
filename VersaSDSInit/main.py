@@ -11,7 +11,9 @@ from commands import (
     BuildCommands,
     ShowCommands,
     DeleteCommands,
-    BackupCommands
+    BackupCommands,
+    ClearCommands,
+    UninstallCommands
 )
 
 
@@ -26,6 +28,8 @@ class VersaSDSTools():
         self._back_cmds = BackupCommands(self.subp)
         self._show_cmds = ShowCommands(self.subp)
         self._delete_cmds = DeleteCommands(self.subp)
+        self._clear_cmds = ClearCommands(self.subp)
+        self._uninstall_cmds = UninstallCommands(self.subp)
         self.setup_parser()
 
     def setup_parser(self):

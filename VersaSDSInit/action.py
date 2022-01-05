@@ -87,6 +87,10 @@ class Host():
         if sys_version:
             return sys_version[0]
 
+    def clear_ssh(self):
+        cmd = 'rm ~/.ssh/*'
+        utils.exec_cmd(cmd,self.conn)
+
 
 class Corosync():
     original_attr = {'cluster_name': 'debian',
@@ -116,7 +120,7 @@ class Corosync():
         editor.insert_data(nodelist, anchor=self.nodelist_pos,type='above')
         if len(bindnetaddr_list) > 1:
             editor.insert_data(f'\trrp_mode: passive', anchor='        # also set rrp_mode.', type='under')
-        # editor = utils.FileEdit(read_data) # 恢复原始配置文件，需要read_data存在
+        
         utils.exec_cmd(f'echo "{editor.data}" > {corosync_conf_path}',self.conn)
 
 
@@ -135,15 +139,6 @@ class Corosync():
             if not ip in ring_data:
                 return False
         return True
-            
-    
-        # if single_interface:
-        #     if node['private_ip']['ip'] in ring_data:
-        #         return True
-        # else:
-        #     if len(ring_data) == 2:
-        #         if node['public_ip'] in ring_data and node['private_ip']['ip'] in ring_data:
-        #             return True
 
 
     def check_corosync_status(self,nodes,timeout=60):
@@ -170,6 +165,17 @@ class Corosync():
         version = re.findall('version\s\'(.*)\'',result)
         if version:
             return version[0]
+
+
+    def recover_conf(self):
+        editor = utils.FileEdit(read_data) # 恢复原始配置文件，需要read_data存在
+        utils.exec_cmd(f'echo "{editor.data}" > {corosync_conf_path}',self.conn)
+
+    def uninstall(self):
+        cmd = 'apt purge -y corosync'
+        utils.exec_cmd(cmd,self.conn)
+        
+
 
 
 class Pacemaker():
@@ -238,7 +244,7 @@ class Pacemaker():
         utils.exec_cmd(cmd2, self.conn)
 
 
-    def clear(self):
+    def clear_crm_res(self):
         utils.exec_cmd("crm res stop g_linstor p_fs_linstordb p_linstor-controller")
         utils.exec_cmd("crm res stop ms_drbd_linstordb p_drbd_linstordb")
         utils.exec_cmd("crm res stop drbd-attr")
@@ -247,6 +253,15 @@ class Pacemaker():
         utils.exec_cmd("crm conf del g_linstor ms_drbd_linstordb p_drbd_linstordb")
         utils.exec_cmd("crm conf del drbd-attr")
 
+    def clear_crm_node(self,node):
+        utils.exec_cmd(f"crm conf del {node}")
+
+
+    def uninstall(self):
+        cmd = 'apt purge -y pacemaker crmsh corosync ntpdate'
+        utils.exec_cmd(cmd,self.conn)
+        
+        
 
 class TargetCLI():
     def __init__(self,conn=None):
@@ -297,6 +312,12 @@ class TargetCLI():
         version = re.findall('version\s*(.*)',result)
         if version:
             return version[0]
+
+
+    def uninstall(self):
+        cmd = 'apt purge -y targetcli-fb'
+        utils.exec_cmd(cmd,self.conn)
+
 
 
 class ServiceSet():
@@ -389,8 +410,7 @@ class ServiceSet():
             return 'enable'
         else:
             return 'disable'
-
-
+            
 
 
 
@@ -449,6 +469,19 @@ class RA():
         ra_path = '../RA'
 
         return ra_path
+
+    def recover(self):
+        # 使用备份的文件
+
+        # iSCSILogicalUnit
+        cmd1 = f'mv {self.heartbeat_path}/iSCSILogicalUnit.bak {self.heartbeat_path}/iSCSILogicalUnit'
+        if bool(utils.exec_cmd(f'[ -f {self.heartbeat_path}/iSCSILogicalUnit.bak ] && echo True',self.conn)):
+            utils.exec_cmd(cmd1,self.conn)
+
+        # iSCSITarget
+        cmd2 = f'mv {self.heartbeat_path}/iSCSITarget.bak {self.heartbeat_path}/iSCSITarget'
+        if bool(utils.exec_cmd(f'[ -f {self.heartbeat_path}/iSCSITarget.bak ] && echo True',self.conn)):
+            utils.exec_cmd(cmd2,self.conn)
 
 
 class HALinstorController():
@@ -706,6 +739,10 @@ class DRBD():
         if version_kernel:
             return version_kernel[0]
 
+    def uninstall(self):
+        cmd = 'apt purge -y software-properties-common && apt purge -y drbd-utils  drbd-dkms'
+        utils.exec_cmd(cmd,self.conn)
+
 
 class Linstor():
     def __init__(self,conn=None):
@@ -756,7 +793,12 @@ class Linstor():
         if version:
             return version[0]
 
+    def clear(self):
+        utils.exec_cmd('rm -rf /etc/linstor/linstor-client.conf',self.conn)
 
+    def uninstall(self):
+        cmd = 'apt purge -y  linstor-controller linstor-satellite linstor-client'
+        utils.exec_cmd(cmd,self.conn)
 
 
 class LVM():
@@ -783,6 +825,9 @@ class LVM():
         cmd = 'apt install -y lvm2'
         utils.exec_cmd(cmd, self.conn)
 
+    def uninstall(self):
+        cmd = 'apt purge -y lvm2'
+        utils.exec_cmd(cmd, self.conn)
 
-    def remove_vg0(self):
-        utils.exec_cmd("vgremove -y vg0",self.conn)
+    def remove_vg(self,vg):
+        utils.exec_cmd(f"vgremove -y {vg}",self.conn)
