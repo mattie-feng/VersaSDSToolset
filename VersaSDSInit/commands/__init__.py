@@ -4,4 +4,6 @@ from .check_cmds import CheckCommands
 from .backup_cmds import BackupCommands
 from .delete_cmds import DeleteCommands
 from .show_cmds import ShowCommands
+from .clear_cmds import ClearCommands
+from .uninstall_cmds import UninstallCommands
 

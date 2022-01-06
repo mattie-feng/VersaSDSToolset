@@ -19,6 +19,13 @@ class ClearCommands():
         p_vg = subp_clear.add_parser('vg', help = 'clear vg')
         p_vg.set_defaults(func=self.clear_vg)
 
+        p_corosync = subp_clear.add_parser('corosync', help = 'clear corosync')
+        p_corosync.set_defaults(func=self.clear_corosync)
+
+
+        p_re = subp_clear.add_parser('re', help = 'restart sallite')
+        p_re.set_defaults(func=self.restart_linstor)
+
         # p_pacemaker = subp_install.add_parser('pacemaker', help = 'uninstall pacemaker')
         # p_pacemaker.set_defaults(func=self.uninstall_pacemaker)
 
@@ -46,16 +53,22 @@ class ClearCommands():
     #     sc.uninstall_pacemaker()
 
     @classmethod
+    def clear_corosync(self,args):
+        sc = control.PacemakerConsole()
+        print('恢复 corosync 配置文件')
+        sc.recover_corosync_conf()
+
+    @classmethod
     def restart_linstor(self,args):
         sc = control.LinstorConsole()
         print('重启linstor集群的controller和satellite')
-        sc.uninstall_targetcli()
+        sc.restart_linstor()
 
     @classmethod
     def clear_all(self,args):
         print('*start*')
         self.clear_crm(args)
-        self.uninstall_linbit(args)
-        self.uninstall_pacemaker(args)
-        self.uninstall_targetcli(args)
+        self.clear_vg(args)
+        self.clear_corosync(args)
+        self.restart_linstor(args)
         print('*success*')

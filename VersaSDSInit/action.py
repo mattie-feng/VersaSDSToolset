@@ -753,7 +753,7 @@ class Linstor():
         cmd = f'echo "{conf_data}" > /etc/linstor/linstor-client.conf'
         utils.exec_cmd(cmd,self.conn)
 
-    def restart_controller(self,timeout=20):
+    def restart_controller(self,timeout=30):
         cmd = "systemctl restart linstor-controller"
         utils.exec_cmd(cmd,self.conn)
         t_beginning = time.time()
@@ -799,6 +799,8 @@ class Linstor():
     def uninstall(self):
         cmd = 'apt purge -y  linstor-controller linstor-satellite linstor-client'
         utils.exec_cmd(cmd,self.conn)
+
+    
 
 
 class LVM():
