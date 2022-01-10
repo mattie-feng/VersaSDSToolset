@@ -245,16 +245,16 @@ class Pacemaker():
 
 
     def clear_crm_res(self):
-        utils.exec_cmd("crm res stop g_linstor p_fs_linstordb p_linstor-controller")
-        utils.exec_cmd("crm res stop ms_drbd_linstordb p_drbd_linstordb")
-        utils.exec_cmd("crm res stop drbd-attr")
+        utils.exec_cmd("crm res stop g_linstor p_fs_linstordb p_linstor-controller",self.conn)
+        utils.exec_cmd("crm res stop ms_drbd_linstordb p_drbd_linstordb",self.conn)
+        utils.exec_cmd("crm res stop drbd-attr",self.conn)
         time.sleep(2)
-        utils.exec_cmd("crm conf del g_linstor p_fs_linstordb p_linstor-controller")
-        utils.exec_cmd("crm conf del g_linstor ms_drbd_linstordb p_drbd_linstordb")
-        utils.exec_cmd("crm conf del drbd-attr")
+        utils.exec_cmd("crm conf del g_linstor p_fs_linstordb p_linstor-controller",self.conn)
+        utils.exec_cmd("crm conf del g_linstor ms_drbd_linstordb p_drbd_linstordb",self.conn)
+        utils.exec_cmd("crm conf del drbd-attr",self.conn)
 
     def clear_crm_node(self,node):
-        utils.exec_cmd(f"crm conf del {node}")
+        utils.exec_cmd(f"crm conf del {node}",self.conn)
 
 
     def uninstall(self):

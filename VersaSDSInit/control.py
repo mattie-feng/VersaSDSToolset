@@ -117,6 +117,14 @@ class PacemakerConsole():
 
         return lst
 
+    def recover_corosync_conf(self):
+        for ssh in self.conn.list_ssh:
+            corosync = action.Corosync(ssh)
+            corosync.recover_conf()
+            corosync.restart_corosync()
+            # pacemaker = action.Pacemaker(ssh)
+            # pacemaker.restart()
+    
     def packmaker_conf_change(self):
         cluster_name = self.conn.conf_file.get_cluster_name()
         packmaker = action.Pacemaker()
@@ -229,11 +237,25 @@ class PacemakerConsole():
             ip_service = action.IpService(ssh)
             lst_up.append(ip_service.up_ip_service(node['private_ip']['device']))
 
-    def clear_crm_res(self):
-        handler = action.Pacemaker()
-        handler.clear_crm_res()
-        for node in self.conn.cluster['node']:
-            handler.clear_crm_node(node['hostname'])
+    def clear_crm_res(self,node):
+        if node:
+            for ssh, n in zip(self.conn.list_ssh, self.conn.cluster['node']):
+                if node == n['hostname']:
+                    pacemaker = action.Pacemaker(ssh)
+        else:
+            pacemaker = action.Pacemaker()
+        pacemaker.clear_crm_res()
+       
+
+    def clear_crm_node(self):
+        for ssh, local_node in zip(self.conn.list_ssh, self.conn.cluster['node']):
+            pacemaker = action.Pacemaker(ssh)
+            pacemaker.restart()
+            time.sleep(2)
+            for node in self.conn.cluster['node']:
+                if local_node['hostname'] != node['hostname']:
+                    pacemaker.clear_crm_node(node['hostname'])
+            
 
 
     
@@ -363,6 +385,16 @@ class LinstorConsole():
         for ssh in self.conn.list_ssh:
             handler = action.Linstor(ssh)
             handler.clear()
+
+    def restart_linstor(self):
+        for ssh in self.conn.list_ssh:
+            handler = action.Linstor(ssh)
+            handler.restart_satellite()
+
+        handler = action.Linstor()
+        handler.restart_controller()
+        
+        
 
 
             

@@ -11,9 +11,11 @@ class ClearCommands():
             'clear',
             help='clear VersaSDS configuration'
         )
+        parser_clear.add_argument('node',nargs = '?',default = None)
         subp_clear = parser_clear.add_subparsers(dest='subargs_clear')
 
         p_crm = subp_clear.add_parser('crm', help = 'clear crm cluster resource')
+        p_crm.add_argument('node',nargs = '?',default = None)
         p_crm.set_defaults(func=self.clear_crm)
 
         p_vg = subp_clear.add_parser('vg', help = 'clear vg')
@@ -22,15 +24,8 @@ class ClearCommands():
         p_corosync = subp_clear.add_parser('corosync', help = 'clear corosync')
         p_corosync.set_defaults(func=self.clear_corosync)
 
-
-        p_re = subp_clear.add_parser('re', help = 'restart sallite')
-        p_re.set_defaults(func=self.restart_linstor)
-
-        # p_pacemaker = subp_install.add_parser('pacemaker', help = 'uninstall pacemaker')
-        # p_pacemaker.set_defaults(func=self.uninstall_pacemaker)
-
-        # p_targetcli = subp_install.add_parser('targetcli', help = 'uninstall targetcli')
-        # p_targetcli.set_defaults(func=self.uninstall_targetcli)
+        # p_re = subp_clear.add_parser('re', help = 'restart sallite')
+        # p_re.set_defaults(func=self.restart_linstor)
 
         parser_clear.set_defaults(func=self.clear_all)
 
@@ -38,7 +33,14 @@ class ClearCommands():
     def clear_crm(self,args):
         sc = control.PacemakerConsole()
         print('清除crm集群的相关资源')
-        sc.clear_crm_res()
+        sc.clear_crm_res(args.node)
+
+    @classmethod
+    def clear_crm_node(self,args):
+        sc = control.PacemakerConsole()
+        print("清除 crm 节点")
+        sc.clear_crm_node()
+
 
     @classmethod
     def clear_vg(self,args):
@@ -46,11 +48,6 @@ class ClearCommands():
         print('清除vg')
         sc.remove_vg()
 
-    # @classmethod
-    # def uninstall_pacemaker(self,args):
-    #     sc = control.VersaSDSSoftConsole()
-    #     print('卸载pacemaker相关软件')
-    #     sc.uninstall_pacemaker()
 
     @classmethod
     def clear_corosync(self,args):
@@ -70,5 +67,6 @@ class ClearCommands():
         self.clear_crm(args)
         self.clear_vg(args)
         self.clear_corosync(args)
+        self.clear_crm_node(args)
         self.restart_linstor(args)
         print('*success*')
