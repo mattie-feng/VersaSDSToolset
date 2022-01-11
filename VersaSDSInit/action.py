@@ -198,6 +198,9 @@ class Pacemaker():
         cmd = "crm config rsc_defaults resource-stickiness=1000"
         utils.exec_cmd(cmd, self.conn)
 
+    def restart(self):
+        cmd = "systemctl restart pacemaker"
+        utils.exec_cmd(cmd, self.conn)
 
     def check_crm_conf(self):
         cmd = 'crm config show | cat'

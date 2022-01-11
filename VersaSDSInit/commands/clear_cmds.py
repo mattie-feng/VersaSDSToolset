@@ -24,15 +24,15 @@ class ClearCommands():
         p_corosync = subp_clear.add_parser('corosync', help = 'clear corosync')
         p_corosync.set_defaults(func=self.clear_corosync)
 
-        # p_re = subp_clear.add_parser('re', help = 'restart sallite')
-        # p_re.set_defaults(func=self.restart_linstor)
+        p_linstordb = subp_clear.add_parser('linstordb', aliases=['ldb'], help='clear linstordb')
+        p_linstordb.set_defaults(func=self.clear_linstordb)
 
         parser_clear.set_defaults(func=self.clear_all)
 
     @classmethod
     def clear_crm(self,args):
         sc = control.PacemakerConsole()
-        print('清除crm集群的相关资源')
+        print('清除 crm 集群的相关资源')
         sc.clear_crm_res(args.node)
 
     @classmethod
@@ -45,8 +45,13 @@ class ClearCommands():
     @classmethod
     def clear_vg(self,args):
         sc = control.LVMConsole()
-        print('清除vg')
+        print('清除 vg')
         sc.remove_vg()
+
+    @classmethod
+    def clear_linstordb(self,args):
+        controller = control.LinstorConsole()
+        controller.destroy_linstordb()
 
 
     @classmethod
@@ -58,7 +63,7 @@ class ClearCommands():
     @classmethod
     def restart_linstor(self,args):
         sc = control.LinstorConsole()
-        print('重启linstor集群的controller和satellite')
+        print('重启 linstor 集群的 controller 和 satellite')
         sc.restart_linstor()
 
     @classmethod
