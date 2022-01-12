@@ -41,6 +41,9 @@ class BuildCommands():
         p_ra = subp_build.add_parser('ra', help='build ra')
         p_ra.set_defaults(func=self.build_ra)
 
+        p_ra = subp_build.add_parser('pool', help='build pool')
+        p_ra.set_defaults(func=self.build_pool)
+
         p_controller = subp_build.add_parser('controller' ,help='build HA linstor-controller')
         p_controller.set_defaults(func=self.build_controller)
 
@@ -137,6 +140,19 @@ class BuildCommands():
         self.build_ra(args)
         print('*success*')
 
+    
+    def build_pool(self, args):
+        controller_lvm = control.LVMConsole()
+        controller_linstor = control.LinstorConsole()
+        print("*start")
+        controller_lvm.create_dirver_pool()
+        print('创建PV/VG/LV成功')
+        controller_linstor.create_conf_file()
+        controller_linstor.create_nodes()
+        print('创建节点成功')
+        controller_linstor.create_pools()
+        print('*success*')
+
 
     def build_controller(self, args):
         controller = control.LinstorConsole()
@@ -157,11 +173,13 @@ class BuildCommands():
         print('*success*')
 
 
+
+
     def build_all(self,args):
         controller_lvm = control.LVMConsole()
         controller_linstor = control.LinstorConsole()
 
-        InstallCommands.install_software(args)
+        # InstallCommands.install_software(args)
         print("1. 安装软件完成")
         self.build_pacemaker_cluster(args)
         print("2. 配置pacemaker集群完成")

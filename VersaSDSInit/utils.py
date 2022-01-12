@@ -187,10 +187,12 @@ class ConfFile():
     def get_inferface(self):
         bindnetaddr_list = self.get_bindnetaddr()
         interface_list = []
+        ringnumber = 1
         for bindnetaddr in bindnetaddr_list[1:]:
-            interface = "interface {\n\tringnumber: 1\n\tbindnetaddr: %s\n\tmcastport: 5407\n\tttl: 1\n}"%bindnetaddr
+            interface = "interface {\n\tringnumber: %s\n\tbindnetaddr: %s\n\tmcastport: 5407\n\tttl: 1\n}"%(ringnumber,bindnetaddr)
             interface = FileEdit.add_data_to_head(interface, '\t')
             interface_list.append(interface)
+            ringnumber += 1
         return "\n".join(interface_list)
 
 
