@@ -422,9 +422,6 @@ class SSHAuthorizeNoMGN(SSHAuthorize):
         hostname = utils.exec_cmd('hostname',conn).strip()
         return hostname
 
-
-
-
     @staticmethod
     def get_public_key(conn):
         # 已存在会提示是否覆盖，需要提前判断文件是否存在
@@ -450,7 +447,6 @@ class SSHAuthorizeNoMGN(SSHAuthorize):
 
     def convert_all_keys_by_cluster_to_string(self,cluster_name):
         str = ""
-        # 空不会进入循环，考虑 if 是否必要
         if self.get_list_key_node_for_cluster(cluster_name):
             for pb_key in self.get_list_key_node_for_cluster(cluster_name):
                 str = str + pb_key + '\n'
@@ -480,10 +476,6 @@ class SSHAuthorizeNoMGN(SSHAuthorize):
         :param list_of_nodes:
         :return:
         """
-        if self.cluster_is_exist('Cluster', cluster_name):
-            print('this cluster name is exist')
-            return
-
         for node,ssh in zip(cluster_data,list_ssh):
             public_key = self.get_public_key(ssh)
             hostname = self.get_hostname(ssh)

@@ -176,25 +176,35 @@ class ConfFile():
 
     def get_bindnetaddr(self):
         node = self.cluster['node'][0]
-        list_public_ip = node['public_ip'].split('.')
-        bindnetaddr1 = f"{'.'.join(list_public_ip[:3])}.0"
-
-        list_private_ip = node['private_ip']['ip'].split('.')
-        bindnetaddr2 = f"{'.'.join(list_private_ip[:3])}.0"
-
-        return [bindnetaddr1,bindnetaddr2]
+        ips = node['heartbeat_line']
+        lst = []
+        for ip in ips:
+            ip_list = ip.split(".")
+            lst.append(f"{'.'.join(ip_list[:3])}.0")
+        return lst
 
 
     def get_inferface(self):
-        bindnetaddr = self.get_bindnetaddr()[1]
-        interface = "interface {\n\tringnumber: 1\n\tbindnetaddr: %s\n\tmcastport: 5407\n\tttl: 1\n}"%bindnetaddr
-        return interface
+        bindnetaddr_list = self.get_bindnetaddr()
+        interface_list = []
+        for bindnetaddr in bindnetaddr_list[1:]:
+            interface = "interface {\n\tringnumber: 1\n\tbindnetaddr: %s\n\tmcastport: 5407\n\tttl: 1\n}"%bindnetaddr
+            interface = FileEdit.add_data_to_head(interface, '\t')
+            interface_list.append(interface)
+        return "\n".join(interface_list)
+
 
     def get_nodelist(self):
         str_node_all = ""
+
         for node in self.cluster['node']:
+            dict_node = {}
             str_node = "node "
-            dict_node = {'ring0_addr':node['public_ip'],'ring1_addr':node['private_ip']['ip'],'name':node['hostname']}
+            index = 0
+            for ip in node["heartbeat_line"]:
+                dict_node.update({f"ring{index}_addr":ip})
+                index += 1
+            dict_node.update({'name':node['hostname']})
             str_node += json.dumps(dict_node, indent=4, separators=(',', ': '))
             str_node = FileEdit.remove_comma(str_node)
             str_node_all += str_node + '\n'
@@ -254,11 +264,23 @@ def exec_cmd(cmd,conn=None):
     else:
         result = subprocess.getoutput(cmd)
     result = result.decode() if isinstance(result,bytes) else result
-    log_data = f'{conn._host if conn else "localhost"} - {result}'
+    log_data = f'{conn._host if conn else "localhost"} - {cmd} - {result}'
     Log().logger.info(log_data)
     if result:
         result = result.rstrip('\n')
     return result
+
+
+def run_timeout(flag,run,timeout=30):
+    t_beginning = time.time()
+    while True:
+        run()
+        if flag:
+           break
+        time.sleep(1)
+        seconds_passed = time.time() - t_beginning
+        if timeout and seconds_passed > timeout:
+            raise TimeoutError()
 
 
 
@@ -281,4 +303,3 @@ class Log():
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         fh.setFormatter(formatter)
         logger.addHandler(fh)
-
