@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import paramiko
-import socket
 import os
 import subprocess
 import yaml

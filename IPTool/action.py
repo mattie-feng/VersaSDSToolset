@@ -1,4 +1,4 @@
-import time
+# -*- coding: utf-8 -*-
 import utils
 
 
@@ -62,6 +62,28 @@ class IpService(object):
             if result["st"]:
                 return bond_slave
 
+    def add_bond_options(self, device, option):
+        #    nmcli connection modify vtel_bond0 +bond.options lacp_rate=fast
+        #    nmcli connection modify vtel_bond0 +bond.options  xmit_hash_policy=layer3+4
+        #    nmcli connection modify vtel_bond0 +bond.options  miimon=100
+        connection_name = f'vtel_{device}'
+        cmd = f"nmcli connection modify {connection_name} +bond.options {option}"
+        result = utils.exec_cmd(cmd, self.conn)
+        if result:
+            if result["st"]:
+                return True
+
+    def delete_bond_options(self, device, option):
+        #    nmcli connection modify vtel_bond0 -bond.options lacp_rate
+        #    nmcli connection modify vtel_bond0 -bond.options  xmit_hash_policy
+        #    nmcli connection modify vtel_bond0 -bond.options  miimon
+        connection_name = f'vtel_{device}'
+        cmd = f"nmcli connection modify {connection_name} -bond.options {option}"
+        result = utils.exec_cmd(cmd, self.conn)
+        if result:
+            if result["st"]:
+                return True
+
     def delete_bond_slave(self, master, device):
         bond_slave = f'vtel_{master}-slave-{device}'
         cmd = f"nmcli connect delete {bond_slave}"
@@ -112,18 +134,6 @@ class IpService(object):
                 print(result["rt"])
                 return result["rt"]
 
-    # for bonding modify
-    def get_hostname(self):
-        cmd = "hostname"
-        result = utils.exec_cmd(cmd, self.conn)
-        if result:
-            if result["st"]:
-                return result["rt"]
-
-    def modify_hostname(self, hostname):
-        cmd = f'hostnamectl set-hostname {hostname}'
-        utils.exec_cmd(cmd, self.conn)
-
     def get_device_status(self):
         cmd = "nmcli device status"
         result = utils.exec_cmd(cmd, self.conn)
@@ -137,7 +147,3 @@ class IpService(object):
         if result:
             if result["st"]:
                 return result["rt"]
-
-    def modify_hosts_file(self, old_hostname, new_hostname):
-        cmd = f"sed -i 's/{old_hostname}$/{new_hostname}/g' /etc/hosts"
-        utils.exec_cmd(cmd, self.conn)
