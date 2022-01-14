@@ -41,15 +41,17 @@ class BuildCommands():
         p_ra = subp_build.add_parser('ra', help='build ra')
         p_ra.set_defaults(func=self.build_ra)
 
-        p_ra = subp_build.add_parser('pool', help='build pool')
-        p_ra.set_defaults(func=self.build_pool)
+        p_pool = subp_build.add_parser('pool', help='build pool')
+        p_pool.add_argument('-sp',default = 'pool0')
+        p_pool.set_defaults(func=self.build_pool)
 
         p_controller = subp_build.add_parser('controller' ,help='build HA linstor-controller')
+        p_controller.add_argument('-sp',default = 'pool0')
         p_controller.set_defaults(func=self.build_controller)
 
         p_drbd_attr = subp_build.add_parser('drbdattr', help='build drbd-attr')
         p_drbd_attr.set_defaults(func=self.build_drbd_attr)
-
+        
 
     def build_ip(self, args):
         controller = control.PacemakerConsole()
@@ -150,7 +152,7 @@ class BuildCommands():
         controller_linstor.create_conf_file()
         controller_linstor.create_nodes()
         print('创建节点成功')
-        controller_linstor.create_pools()
+        controller_linstor.create_pools(args.node)
         print('*success*')
 
 
@@ -158,7 +160,7 @@ class BuildCommands():
         controller = control.LinstorConsole()
         print('*start*')
         print("start to build HA controller")
-        controller.build_ha_controller()
+        controller.build_ha_controller(args.sp)
         print('Finish configuration，checking')
         if not controller.check_ha_controller():
             print('Fail，exit')

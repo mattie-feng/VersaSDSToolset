@@ -277,35 +277,35 @@ class LinstorConsole():
             linstor = action.Linstor(ssh)
             linstor.create_node(node['hostname'],node['public_ip'])
 
-    def create_pools(self):
+    def create_pools(self, sp):
         # 待测试 以及确定thinlv创建时用到的lvm资源的格式。
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             linstor = action.Linstor(ssh)
             vol = node['lvm_device'].split("/")
             if len(vol) == 1:
-                linstor.create_lvm_sp(node['hostname'],node['lvm_device'])
+                linstor.create_lvm_sp(node['hostname'],node['lvm_device'],sp)
             elif len(vol) == 2:
-                linstor.create_lvmthin_sp(node['hostname'],node['lvm_device'])
+                linstor.create_lvmthin_sp(node['hostname'],node['lvm_device'],sp)
 
     # HA controller配置
-    def build_ha_controller(self):
+    def build_ha_controller(self, sp):
         backup_path = self.conn.cluster['backup_path']
         ha = action.HALinstorController()
-        ha.create_rd('linstordb')
-        ha.create_vd('linstordb', '250M')
-
         if not ha.linstor_is_conn():
             print('LINSTOR connection refused')
             sys.exit()
 
         node_list = [node['hostname'] for node in self.conn.cluster['node']]
-        if not ha.pool0_is_exist(node_list):
-            print('storage-pool：pool0 does not exist')
+        if not ha.pool_is_exist(node_list,sp):
+            print(f'storage-pool：{sp} does not exist')
             sys.exit()
 
-        for node in self.conn.cluster['node']:
-            ha.create_res('linstordb',node['hostname'],'pool0')
+        ha.create_rd('linstordb')
+        ha.create_vd('linstordb', '250M')
 
+        for node in self.conn.cluster['node']:
+            ha.create_res('linstordb',node['hostname'], sp)
+                
 
         for ssh in self.conn.list_ssh:
             ha = action.HALinstorController(ssh)
@@ -539,7 +539,7 @@ class LVMConsole():
             pv_list.append(lvm.pv_create(node['pool_disk']))
         for r,node in zip(pv_list,self.conn.cluster['node']):
             if not r:
-                print(f"{node['pool_disk']} is not on {node['hostname']}")
+                print(f"{node['pool_disk']} is not on {node['hostname']} or it has been used")
                 sys.exit()
 
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
