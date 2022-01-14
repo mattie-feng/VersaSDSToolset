@@ -50,9 +50,9 @@ class Bonding(object):
             gateway = f"{'.'.join(new_ip.split('.')[:3])}.1"
             bonding.modify_ip(bonding_name, new_ip, gateway)
             if mode == "802.3ad":
-                bonding.add_bond_options(bonding_name, "lacp_rate=fast")
                 bonding.add_bond_options(bonding_name, "xmit_hash_policy=layer3+4")
                 bonding.add_bond_options(bonding_name, "miimon=100")
+                bonding.add_bond_options(bonding_name, "lacp_rate=fast")
         for device in device_list:
             bonding_slave = bonding.add_bond_slave(f"{bonding_name}", device)
             if bonding_slave:
@@ -63,35 +63,17 @@ class Bonding(object):
 
     def modify_bond_by_file(self, node, bonding_name, mode, device_list, new_ip):
         bonding = action.IpService(node)
-        lc_mode = bonding.get_mode(bonding_name)
         connection = bonding.get_connection()
 
-        if not self.check_mode(lc_mode, mode):
-            bonding.modify_bonding_mode(bonding_name, mode)
-            if self.check_mode(lc_mode, "802.3ad"):
-                bonding.delete_bond_options(bonding_name, "lacp_rate")
-                bonding.delete_bond_options(bonding_name, "xmit_hash_policy")
-                bonding.delete_bond_options(bonding_name, "miimon")
-            if mode == "802.3ad":
-                bonding.add_bond_options(bonding_name, "lacp_rate=fast")
-                bonding.add_bond_options(bonding_name, "xmit_hash_policy=layer3+4")
-                bonding.add_bond_options(bonding_name, "miimon=100")
-            bonding.up_ip_service(f'vtel_{bonding_name}')
-            bonding.print_mode(bonding_name)
-
-        # bond0 的IP不一致
-        lc_ip_data = bonding.get_bond_ip(bonding_name)
-
-        if not self.check_bond_ip(new_ip, lc_ip_data):
-            gateway = f"{'.'.join(new_ip.split('.')[:3])}.1"
-            bonding.modify_ip(bonding_name, new_ip, gateway)
-            bonding.up_ip_service(f'vtel_{bonding_name}')
+        self.modify_bonding_mode(node, bonding_name, mode)
+        self.modify_bonding_ip(node, bonding_name, new_ip)
 
         # TODO 删除bond重新创建 or 根据配置文件信息一一对比来增加或删除
         lc_device_date = bonding.get_device_status()
         for device in device_list:
             bonding_slave = f'vtel_{bonding_name}-slave-{device}'
             if not self.check_bonding_slave(bonding_slave, connection):
+                print("Change bonding slave device.")
                 bonding.add_bond_slave(f"{bonding_name}", device)
                 if bonding_slave:
                     bonding.up_ip_service(bonding_slave)
@@ -126,14 +108,41 @@ class Bonding(object):
 
     def modify_bonding_mode(self, node, device, mode):
         bonding = action.IpService(node)
-        bonding.modify_bonding_mode(device, mode)
-        bonding.up_ip_service(f'vtel_{device}')
-        bonding.print_mode(device)
-        # if bonding.down_connect(f'vtel_{device}'):
-        #     if bonding.modify_bonding_mode(device, mode):
-        #         print(f'Success in modify {device} mode of {mode}')
-        # else:
-        #     print(f"Failed to modify {device} mode of {mode}")
+        lc_mode = bonding.get_mode(device)
+        if not self.check_mode(lc_mode, mode):
+            print("Change bonding mode.")
+            if self.check_mode(lc_mode, "802.3ad"):
+                bonding.delete_bond_options(device, "lacp_rate")
+                bonding.delete_bond_options(device, "xmit_hash_policy")
+                bonding.delete_bond_options(device, "miimon")
+            bonding.modify_bonding_mode(device, mode)
+            if mode == "802.3ad":
+                bonding.add_bond_options(device, "xmit_hash_policy=layer3+4")
+                bonding.add_bond_options(device, "miimon=100")
+                bonding.add_bond_options(device, "lacp_rate=fast")
+            bonding.up_ip_service(f'vtel_{device}')
+        else:
+            if not self.modify_mode:
+                print("Same bonding mode. Do nothing.")
+
+    def modify_bonding_ip(self, node, device, ip):
+        if not self.modify_mode:
+            if not utils.check_ip(ip):
+                sys.exit()
+        bonding = action.IpService(node)
+        lc_ip_data = bonding.get_bond_ip(device)
+        if not self.check_bond_ip(ip, lc_ip_data):
+            print("Change bonding IP.")
+            gateway = f"{'.'.join(ip.split('.')[:3])}.1"
+            bonding.modify_ip(device, ip, gateway)
+            bonding.up_ip_service(f'vtel_{device}')
+        else:
+            if not self.modify_mode:
+                print("Same bonding IP. Do nothing.")
+
+    def modify_bonding_slave(self):
+        # TODO 网卡信息改变后的bonding配置处理
+        pass
 
     def get_slave_via_bonding_name(self, bonding_name, string):
         slave_list = re.findall(f'({bonding_name}-slave-\S*)\s+\S+\s+\S+\s+\S+', string)
@@ -151,10 +160,11 @@ class Bonding(object):
             return True
 
     def check_bond_ip(self, tg_ip, lc_ip_data):
-        # TODO 不严谨，76 & 761, 使用正则匹配IP不用in
         "Eg. lc_ip_data: IP4.ADDRESS[1]:                         10.203.1.76/24"
-        if tg_ip in lc_ip_data:
-            return True
+        ip_obj = re.search(r'\d+\.\d+\.\d+\.\d+', lc_ip_data)
+        if ip_obj:
+            if ip_obj.group() == tg_ip:
+                return True
 
     def check_device(self, device_list, lc_device_data):
         flag = True

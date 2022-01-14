@@ -80,8 +80,13 @@ class IPTool():
                                    dest='mode',
                                    choices=["balance-rr", "active-backup", "balance-xor", "broadcast", "802.3ad",
                                             "balance-tlb", "balance-alb"],
-                                   required=True,
+                                   # required=True,
                                    help='Bonding mode')
+        parser_modify.add_argument('-ip',
+                                   '--ip',
+                                   dest='ip',
+                                   # required=True,
+                                   help='Bonding IP')
 
         # Bonding function
         parser_apply.set_defaults(func=self.apply_file)
@@ -119,7 +124,10 @@ class IPTool():
 
     def modify_mode(self, args):
         bonding = control.Bonding()
-        bonding.modify_bonding_mode(args.node, args.bonding, args.mode)
+        if args.mode:
+            bonding.modify_bonding_mode(args.node, args.bonding, args.mode)
+        if args.ip:
+            bonding.modify_bonding_ip(args.node, args.bonding, args.ip)
 
 
 def main():
