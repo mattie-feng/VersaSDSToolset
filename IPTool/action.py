@@ -63,9 +63,6 @@ class IpService(object):
                 return bond_slave
 
     def add_bond_options(self, device, option):
-        #    nmcli connection modify vtel_bond0 +bond.options lacp_rate=fast
-        #    nmcli connection modify vtel_bond0 +bond.options  xmit_hash_policy=layer3+4
-        #    nmcli connection modify vtel_bond0 +bond.options  miimon=100
         connection_name = f'vtel_{device}'
         cmd = f"nmcli connection modify {connection_name} +bond.options {option}"
         result = utils.exec_cmd(cmd, self.conn)
@@ -74,9 +71,6 @@ class IpService(object):
                 return True
 
     def delete_bond_options(self, device, option):
-        #    nmcli connection modify vtel_bond0 -bond.options lacp_rate
-        #    nmcli connection modify vtel_bond0 -bond.options  xmit_hash_policy
-        #    nmcli connection modify vtel_bond0 -bond.options  miimon
         connection_name = f'vtel_{device}'
         cmd = f"nmcli connection modify {connection_name} -bond.options {option}"
         result = utils.exec_cmd(cmd, self.conn)

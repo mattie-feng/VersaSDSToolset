@@ -78,20 +78,26 @@ class IPTool():
         parser_modify.add_argument('-m',
                                    '--mode',
                                    dest='mode',
+                                   action='store',
                                    choices=["balance-rr", "active-backup", "balance-xor", "broadcast", "802.3ad",
                                             "balance-tlb", "balance-alb"],
-                                   # required=True,
                                    help='Bonding mode')
         parser_modify.add_argument('-ip',
                                    '--ip',
                                    dest='ip',
-                                   # required=True,
+                                   action='store',
                                    help='Bonding IP')
+        parser_modify.add_argument('-d',
+                                   '--device',
+                                   dest='device',
+                                   nargs='+',
+                                   action='store',
+                                   help='Bonding device')
 
         # Bonding function
         parser_apply.set_defaults(func=self.apply_file)
-        parser_delete.set_defaults(func=self.delete_bonding)
         parser_create.set_defaults(func=self.create_bonding)
+        parser_delete.set_defaults(func=self.delete_bonding)
         parser_modify.set_defaults(func=self.modify_mode)
         parser_bonding.set_defaults(func=self.print_bond_help)
 
@@ -128,6 +134,8 @@ class IPTool():
             bonding.modify_bonding_mode(args.node, args.bonding, args.mode)
         if args.ip:
             bonding.modify_bonding_ip(args.node, args.bonding, args.ip)
+        if args.device:
+            bonding.modify_bonding_slave(args.node, args.bonding, args.device)
 
 
 def main():

@@ -28,7 +28,9 @@ class Bonding(object):
             connection = bonding.get_connection()
             if self.check_bonding_exist(f'vtel_{bonding_name}', connection):
                 print(f"Modify {bonding_name}.")
-                self.modify_bond_by_file(node, bonding_name, mode, device_list, new_ip)
+                self.modify_bonding_slave(node, bonding_name, device_list)
+                self.modify_bonding_mode(node, bonding_name, mode)
+                self.modify_bonding_ip(node, bonding_name, new_ip)
             else:
                 print(f"Create {bonding_name}.")
                 self.create_bonding(node, bonding_name, mode, device_list, new_ip)
@@ -45,7 +47,6 @@ class Bonding(object):
             lc_device_date = bonding.get_device_status()
             if not self.check_device(device_list, lc_device_date):
                 sys.exit()
-
         if bonding.set_bonding(bonding_name, mode):
             gateway = f"{'.'.join(new_ip.split('.')[:3])}.1"
             bonding.modify_ip(bonding_name, new_ip, gateway)
@@ -54,57 +55,12 @@ class Bonding(object):
                 bonding.add_bond_options(bonding_name, "miimon=100")
                 bonding.add_bond_options(bonding_name, "lacp_rate=fast")
         for device in device_list:
-            bonding_slave = bonding.add_bond_slave(f"{bonding_name}", device)
+            bonding_slave = bonding.add_bond_slave(bonding_name, device)
             if bonding_slave:
                 bonding.up_ip_service(bonding_slave)
             else:
                 print(f'Failed to add bond slave about {device}')
         bonding.up_ip_service(f'vtel_{bonding_name}')
-
-    def modify_bond_by_file(self, node, bonding_name, mode, device_list, new_ip):
-        bonding = action.IpService(node)
-        connection = bonding.get_connection()
-
-        self.modify_bonding_mode(node, bonding_name, mode)
-        self.modify_bonding_ip(node, bonding_name, new_ip)
-
-        # TODO 删除bond重新创建 or 根据配置文件信息一一对比来增加或删除
-        lc_device_date = bonding.get_device_status()
-        for device in device_list:
-            bonding_slave = f'vtel_{bonding_name}-slave-{device}'
-            if not self.check_bonding_slave(bonding_slave, connection):
-                print("Change bonding slave device.")
-                bonding.add_bond_slave(f"{bonding_name}", device)
-                if bonding_slave:
-                    bonding.up_ip_service(bonding_slave)
-                else:
-                    print(f'Failed to add bond slave about {device}')
-
-    def del_bonding(self, node, device):
-        bonding_name = f'vtel_{device}'
-        bonding = action.IpService(node)
-        connection = bonding.get_connection()
-        if connection:
-            slave_list = self.get_slave_via_bonding_name(bonding_name, connection)
-            if slave_list:
-                print("Started to delete bonding slave")
-                for slave in slave_list:
-                    bonding.down_connect(slave)
-                    if bonding.del_connect(slave):
-                        print(f" Success in deleting {slave}")
-                    else:
-                        print(f" Failed to delete {slave}")
-            if self.check_bonding_exist(bonding_name, connection):
-                bonding.down_connect(bonding_name)
-                print(f"Started to delete {bonding_name}")
-                if bonding.del_connect(bonding_name):
-                    print(f" Success in deleting {bonding_name}")
-                else:
-                    print(f" Failed to delete {bonding_name}")
-            else:
-                print(f"There is no configuration to delete for {device}.")
-        else:
-            print("Can't get any configuration")
 
     def modify_bonding_mode(self, node, device, mode):
         bonding = action.IpService(node)
@@ -140,12 +96,56 @@ class Bonding(object):
             if not self.modify_mode:
                 print("Same bonding IP. Do nothing.")
 
-    def modify_bonding_slave(self):
-        # TODO 网卡信息改变后的bonding配置处理
-        pass
+    def modify_bonding_slave(self, node, bonding_name, device_list):
+        bonding = action.IpService(node)
+        if not self.modify_mode:
+            lc_device_date = bonding.get_device_status()
+            if not self.check_device(device_list, lc_device_date):
+                sys.exit()
+        connection = bonding.get_connection()
+        slave_list = self.get_slave_via_bonding_name(bonding_name, connection)
+        device_slave_list = [f'vtel_{bonding_name}-slave-{i}' for i in device_list]
+        # list_retain = [i for i in device_list if i in slave_list]
+        list_create = [i for i in device_list if f'vtel_{bonding_name}-slave-{i}' not in slave_list]
+        list_delete = [i for i in slave_list if i not in device_slave_list]
+        if list_create or list_delete:
+            print("Change bonding salve device.")
+            for device in list_create:
+                bonding_slave = bonding.add_bond_slave(bonding_name, device)
+                bonding.up_ip_service(bonding_slave)
+            for delete_salve in list_delete:
+                bonding.down_connect(delete_salve)
+                bonding.del_connect(delete_salve)
+            bonding.up_ip_service(f'vtel_{bonding_name}')
+
+    def del_bonding(self, node, device):
+        bonding_name = f'vtel_{device}'
+        bonding = action.IpService(node)
+        connection = bonding.get_connection()
+        if connection:
+            slave_list = self.get_slave_via_bonding_name(device, connection)
+            if slave_list:
+                print("Started to delete bonding slave")
+                for slave in slave_list:
+                    bonding.down_connect(slave)
+                    if bonding.del_connect(slave):
+                        print(f" Success in deleting {slave}")
+                    else:
+                        print(f" Failed to delete {slave}")
+            if self.check_bonding_exist(bonding_name, connection):
+                bonding.down_connect(bonding_name)
+                print(f"Started to delete {bonding_name}")
+                if bonding.del_connect(bonding_name):
+                    print(f" Success in deleting {bonding_name}")
+                else:
+                    print(f" Failed to delete {bonding_name}")
+            else:
+                print(f"There is no configuration to delete for {device}.")
+        else:
+            print("Can't get any configuration")
 
     def get_slave_via_bonding_name(self, bonding_name, string):
-        slave_list = re.findall(f'({bonding_name}-slave-\S*)\s+\S+\s+\S+\s+\S+', string)
+        slave_list = re.findall(f'(vtel_{bonding_name}-slave-\S*)\s+\S+\s+\S+\s+\S+', string)
         return slave_list
 
     def check_bonding_exist(self, bonding_name, string):
@@ -173,7 +173,3 @@ class Bonding(object):
                 print(f"没有{device}, 不能进行bond配置.")
                 flag = False
         return flag
-
-    def check_bonding_slave(self, slave, conect_data):
-        if slave in conect_data:
-            return True
