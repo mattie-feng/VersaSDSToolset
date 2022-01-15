@@ -152,7 +152,7 @@ class BuildCommands():
         controller_linstor.create_conf_file()
         controller_linstor.create_nodes()
         print('创建节点成功')
-        controller_linstor.create_pools(args.node)
+        controller_linstor.create_pools(args.sp)
         print('*success*')
 
 
