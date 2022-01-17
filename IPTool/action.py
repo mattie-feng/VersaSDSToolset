@@ -116,8 +116,7 @@ class IpService(object):
         cmd = f"nmcli connection show"
         result = utils.exec_cmd(cmd, self.conn)
         if result:
-            if result["st"]:
-                return result["rt"]
+            return result["rt"]
 
     def print_mode(self, device):
         cmd = f"cat /proc/net/bonding/{device}"
@@ -132,12 +131,10 @@ class IpService(object):
         cmd = "nmcli device status"
         result = utils.exec_cmd(cmd, self.conn)
         if result:
-            if result["st"]:
-                return result["rt"]
+            return result["rt"]
 
     def get_bond_ip(self, bonding_name):
         cmd = f"nmcli device show {bonding_name} | grep IP4.ADDRESS"
         result = utils.exec_cmd(cmd, self.conn)
         if result:
-            if result["st"]:
-                return result["rt"]
+            return result["rt"]

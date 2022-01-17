@@ -64,6 +64,11 @@ class Bonding(object):
 
     def modify_bonding_mode(self, node, device, mode):
         bonding = action.IpService(node)
+        if not self.modify_mode:
+            connection = bonding.get_connection()
+            if not self.check_bonding_exist(f'vtel_{device}', connection):
+                print(f"{device} does not exist. Do nothing.")
+                sys.exit()
         lc_mode = bonding.get_mode(device)
         if not self.check_mode(lc_mode, mode):
             print("Change bonding mode.")
@@ -82,10 +87,14 @@ class Bonding(object):
                 print("Same bonding mode. Do nothing.")
 
     def modify_bonding_ip(self, node, device, ip):
+        bonding = action.IpService(node)
         if not self.modify_mode:
             if not utils.check_ip(ip):
                 sys.exit()
-        bonding = action.IpService(node)
+            connection = bonding.get_connection()
+            if not self.check_bonding_exist(f'vtel_{device}', connection):
+                print(f"{device} does not exist. Do nothing.")
+                sys.exit()
         lc_ip_data = bonding.get_bond_ip(device)
         if not self.check_bond_ip(ip, lc_ip_data):
             print("Change bonding IP.")
@@ -99,6 +108,10 @@ class Bonding(object):
     def modify_bonding_slave(self, node, bonding_name, device_list):
         bonding = action.IpService(node)
         if not self.modify_mode:
+            connection = bonding.get_connection()
+            if not self.check_bonding_exist(f'vtel_{bonding_name}', connection):
+                print(f"{bonding_name} does not exist. Do nothing.")
+                sys.exit()
             lc_device_date = bonding.get_device_status()
             if not self.check_device(device_list, lc_device_date):
                 sys.exit()
@@ -117,6 +130,9 @@ class Bonding(object):
                 bonding.down_connect(delete_salve)
                 bonding.del_connect(delete_salve)
             bonding.up_ip_service(f'vtel_{bonding_name}')
+        else:
+            if not self.modify_mode:
+                print("Same Device. Do nothing.")
 
     def del_bonding(self, node, device):
         bonding_name = f'vtel_{device}'
@@ -149,7 +165,7 @@ class Bonding(object):
         return slave_list
 
     def check_bonding_exist(self, bonding_name, string):
-        bonding_obj = re.search(f'({bonding_name}\S*)\s+\S+\s+bond\s+\S+', string)
+        bonding_obj = re.search(f'({bonding_name})\s+\S+\s+bond\s+\S+', string)
         if bonding_obj:
             return True
 
