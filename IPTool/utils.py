@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import paramiko
-import socket
 import os
 import subprocess
 import yaml
@@ -16,16 +15,16 @@ def exec_cmd(cmd, conn=None):
         p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, encoding="utf-8")
         if p.returncode == 0:
             result = p.stdout
-            # result = result.decode() if isinstance(result, bytes) else result
+            result = result.decode() if isinstance(result, bytes) else result
             return {"st": True, "rt": result}
         else:
-            # print(f"  Failed to execute command: {cmd}")
-            # print("  Error message:\n", p.stderr.decode())
-            return {"st": False, "rt": p.stderr}
+            result = p.stderr
+            result = result.decode() if isinstance(result, bytes) else result
+            return {"st": False, "rt": result}
 
 
 def check_mode(mode):
-    mode_list = ["balance-rr", "active-backup", "broadcast", "802.3ad", "balance-tlb", "balance-alb"]
+    mode_list = ["balance-rr", "active-backup", "balance-xor", "broadcast", "802.3ad", "balance-tlb", "balance-alb"]
     if mode in mode_list:
         return True
     else:
