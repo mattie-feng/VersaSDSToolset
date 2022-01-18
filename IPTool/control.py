@@ -1,80 +1,145 @@
+# -*- coding: utf-8 -*-
 import sys
 import re
 import utils
 import action
 
 
-class Bonding():
-    def __init__(self, conn=None):
-        self.conn = conn
+class Bonding(object):
+    def __init__(self):
+        self.modify_mode = False
 
-    def create_bonding_by_file(self, file):
-        """create bonding via yaml config file"""
+    def configure_bonding_by_file(self, file):
+        """create or modify bonding via yaml config file"""
         config = utils.ConfFile(file)
         host_config = config.get_config()
+        self.modify_mode = True
         for host in host_config:
-            print('-' * 15, host[0], '-' * 15)
-            self.create_bonding(host[0], host[1], host[2], host[3], host[4])
+            node = host[0]
+            bonding_name = host[1]
+            mode = host[2]
+            device_list = host[3]
+            new_ip = host[4]
+            print('-' * 15, node, '-' * 15)
+            bonding = action.IpService(node)
+            lc_device_date = bonding.get_device_status()
+            if not self.check_device(device_list, lc_device_date):
+                continue
+            connection = bonding.get_connection()
+            if self.check_bonding_exist(f'vtel_{bonding_name}', connection):
+                print(f"Modify {bonding_name}.")
+                self.modify_bonding_slave(node, bonding_name, device_list)
+                self.modify_bonding_mode(node, bonding_name, mode)
+                self.modify_bonding_ip(node, bonding_name, new_ip)
+            else:
+                print(f"Create {bonding_name}.")
+                self.create_bonding(node, bonding_name, mode, device_list, new_ip)
 
     def create_bonding(self, node, bonding_name, mode, device_list, new_ip):
-        if not utils.check_ip(new_ip):
-            sys.exit()
-
         bonding = action.IpService(node)
-        connection = bonding.get_connection()
-        lc_mode = bonding.get_mode(bonding_name)
-        if self.check_bonding_exist(f'vtel_{bonding_name}', connection):
-            print(f"{bonding_name} already exists.")
-            lc_hostname = bonding.get_hostname()
-            if not self.check_hostname(lc_hostname, node):
-                bonding.modify_hostname(node)
-                bonding.modify_hosts_file(lc_hostname, node)
-
-            if not self.check_mode(lc_mode, mode):
-                bonding.modify_bonding_mode(bonding_name, mode)
-                bonding.up_ip_service(f'vtel_{bonding_name}')
-                bonding.print_mode(bonding_name)
-
-            # bond0 的IP不一致
-            lc_ip_data = bonding.get_bond_ip(bonding_name)
-
-            if not self.check_bond_ip(new_ip, lc_ip_data):
-                gateway = f"{'.'.join(new_ip.split('.')[:3])}.1"
-                bonding.modify_ip(bonding_name, new_ip, gateway)
-                bonding.up_ip_service(f'vtel_{bonding_name}')
-
+        if not self.modify_mode:
+            connection = bonding.get_connection()
+            if self.check_bonding_exist(f'vtel_{bonding_name}', connection):
+                print(f"{bonding_name} already exists.")
+                sys.exit()
+            if not utils.check_ip(new_ip):
+                sys.exit()
             lc_device_date = bonding.get_device_status()
-            for device in device_list:
-                if not self.check_device(device, lc_device_date):
-                    print(f"没有{device},退出")
-                    return
+            if not self.check_device(device_list, lc_device_date):
+                sys.exit()
+        if bonding.set_bonding(bonding_name, mode):
+            gateway = f"{'.'.join(new_ip.split('.')[:3])}.1"
+            bonding.modify_ip(bonding_name, new_ip, gateway)
+            if mode == "802.3ad":
+                bonding.add_bond_options(bonding_name, "xmit_hash_policy=layer3+4")
+                bonding.add_bond_options(bonding_name, "miimon=100")
+                bonding.add_bond_options(bonding_name, "lacp_rate=fast")
+        for device in device_list:
+            bonding_slave = bonding.add_bond_slave(bonding_name, device)
+            if bonding_slave:
+                bonding.up_ip_service(bonding_slave)
+            else:
+                print(f'Failed to add bond slave about {device}')
+        bonding.up_ip_service(f'vtel_{bonding_name}')
 
-                bonding_slave = f'vtel_{bonding_name}-slave-{device}'
-                if not self.check_bonding_slave(bonding_slave, connection):
-                    bonding.add_bond_slave(f"{bonding_name}", device)
-                    if bonding_slave:
-                        bonding.up_ip_service(bonding_slave)
-                    else:
-                        print(f'Failed to add bond slave about {device}')
-
+    def modify_bonding_mode(self, node, device, mode):
+        bonding = action.IpService(node)
+        if not self.modify_mode:
+            connection = bonding.get_connection()
+            if not self.check_bonding_exist(f'vtel_{device}', connection):
+                print(f"{device} does not exist. Do nothing.")
+                sys.exit()
+        lc_mode = bonding.get_mode(device)
+        if not self.check_mode(lc_mode, mode):
+            print("Change bonding mode.")
+            if self.check_mode(lc_mode, "802.3ad"):
+                bonding.delete_bond_options(device, "lacp_rate")
+                bonding.delete_bond_options(device, "xmit_hash_policy")
+                bonding.delete_bond_options(device, "miimon")
+            bonding.modify_bonding_mode(device, mode)
+            if mode == "802.3ad":
+                bonding.add_bond_options(device, "xmit_hash_policy=layer3+4")
+                bonding.add_bond_options(device, "miimon=100")
+                bonding.add_bond_options(device, "lacp_rate=fast")
+            bonding.up_ip_service(f'vtel_{device}')
         else:
-            if bonding.set_bonding(bonding_name, mode):
-                gateway = f"{'.'.join(new_ip.split('.')[:3])}.1"
-                bonding.modify_ip(bonding_name, new_ip, gateway)
-            for device in device_list:
-                bonding_slave = bonding.add_bond_slave(f"{bonding_name}", device)
-                if bonding_slave:
-                    bonding.up_ip_service(bonding_slave)
-                else:
-                    print(f'Failed to add bond slave about {device}')
+            if not self.modify_mode:
+                print("Same bonding mode. Do nothing.")
+
+    def modify_bonding_ip(self, node, device, ip):
+        bonding = action.IpService(node)
+        if not self.modify_mode:
+            if not utils.check_ip(ip):
+                sys.exit()
+            connection = bonding.get_connection()
+            if not self.check_bonding_exist(f'vtel_{device}', connection):
+                print(f"{device} does not exist. Do nothing.")
+                sys.exit()
+        lc_ip_data = bonding.get_bond_ip(device)
+        if not self.check_bond_ip(ip, lc_ip_data):
+            print("Change bonding IP.")
+            gateway = f"{'.'.join(ip.split('.')[:3])}.1"
+            bonding.modify_ip(device, ip, gateway)
+            bonding.up_ip_service(f'vtel_{device}')
+        else:
+            if not self.modify_mode:
+                print("Same bonding IP. Do nothing.")
+
+    def modify_bonding_slave(self, node, bonding_name, device_list):
+        bonding = action.IpService(node)
+        if not self.modify_mode:
+            connection = bonding.get_connection()
+            if not self.check_bonding_exist(f'vtel_{bonding_name}', connection):
+                print(f"{bonding_name} does not exist. Do nothing.")
+                sys.exit()
+            lc_device_date = bonding.get_device_status()
+            if not self.check_device(device_list, lc_device_date):
+                sys.exit()
+        connection = bonding.get_connection()
+        slave_list = self.get_slave_via_bonding_name(bonding_name, connection)
+        device_slave_list = [f'vtel_{bonding_name}-slave-{i}' for i in device_list]
+        # list_retain = [i for i in device_list if i in slave_list]
+        list_create = [i for i in device_list if f'vtel_{bonding_name}-slave-{i}' not in slave_list]
+        list_delete = [i for i in slave_list if i not in device_slave_list]
+        if list_create or list_delete:
+            print("Change bonding salve device.")
+            for device in list_create:
+                bonding_slave = bonding.add_bond_slave(bonding_name, device)
+                bonding.up_ip_service(bonding_slave)
+            for delete_salve in list_delete:
+                bonding.down_connect(delete_salve)
+                bonding.del_connect(delete_salve)
             bonding.up_ip_service(f'vtel_{bonding_name}')
+        else:
+            if not self.modify_mode:
+                print("Same Device. Do nothing.")
 
     def del_bonding(self, node, device):
         bonding_name = f'vtel_{device}'
         bonding = action.IpService(node)
         connection = bonding.get_connection()
         if connection:
-            slave_list = self.get_slave_via_bonding_name(bonding_name, connection)
+            slave_list = self.get_slave_via_bonding_name(device, connection)
             if slave_list:
                 print("Started to delete bonding slave")
                 for slave in slave_list:
@@ -85,7 +150,7 @@ class Bonding():
                         print(f" Failed to delete {slave}")
             if self.check_bonding_exist(bonding_name, connection):
                 bonding.down_connect(bonding_name)
-                print("Started to delete bonding")
+                print(f"Started to delete {bonding_name}")
                 if bonding.del_connect(bonding_name):
                     print(f" Success in deleting {bonding_name}")
                 else:
@@ -95,61 +160,32 @@ class Bonding():
         else:
             print("Can't get any configuration")
 
-    def modify_bonding_mode(self, node, device, mode):
-        bonding = action.IpService(node)
-        bonding.modify_bonding_mode(device, mode)
-        bonding.up_ip_service(f'vtel_{device}')
-        bonding.print_mode(device)
-        # if bonding.down_connect(f'vtel_{device}'):
-        #     if bonding.modify_bonding_mode(device, mode):
-        #         print(f'Success in modify {device} mode of {mode}')
-        # else:
-        #     print(f"Failed to modify {device} mode of {mode}")
-
     def get_slave_via_bonding_name(self, bonding_name, string):
-        slave_list = re.findall(f'({bonding_name}-slave-\S*)\s+\S+\s+\S+\s+\S+', string)
+        slave_list = re.findall(f'(vtel_{bonding_name}-slave-\S*)\s+\S+\s+\S+\s+\S+', string)
         return slave_list
 
     def check_bonding_exist(self, bonding_name, string):
-        bonding_obj = re.search(f'({bonding_name}\S*)\s+\S+\s+bond\s+\S+', string)
-        return bonding_obj
-
-    def check_hostname(self, lc_hostname, tg_hostname):
-        if lc_hostname == tg_hostname:
+        bonding_obj = re.search(f'({bonding_name})\s+\S+\s+bond\s+\S+', string)
+        if bonding_obj:
             return True
 
     def check_mode(self, local_mode, conf_mode):
         if conf_mode == 'balance-rr':
-            if 'load balancing (round-robin)' in local_mode:
-                return True
-        elif conf_mode == 'active-backup':
-            if 'active-backup' in local_mode:
-                return True
-        elif conf_mode == 'balance-xor':
-            if 'balance-xor' in local_mode:
-                return True
-        elif conf_mode == 'broadcast':
-            if 'broadcast' in local_mode:
-                return True
-        elif conf_mode == '802.3ad':
-            if '802.3ad' in local_mode:
-                return True
-        elif conf_mode == 'balance-tlb':
-            if 'balance-tlb' in local_mode:
-                return True
-        elif conf_mode == 'balance-alb':
-            if 'balance-alb' in local_mode:
-                return True
+            conf_mode = "load balancing (round-robin)"
+        if conf_mode in local_mode:
+            return True
 
     def check_bond_ip(self, tg_ip, lc_ip_data):
         "Eg. lc_ip_data: IP4.ADDRESS[1]:                         10.203.1.76/24"
-        if tg_ip in lc_ip_data:
-            return True
+        ip_obj = re.search(r'\d+\.\d+\.\d+\.\d+', lc_ip_data)
+        if ip_obj:
+            if ip_obj.group() == tg_ip:
+                return True
 
-    def check_device(self, tg_device, lc_device_data):
-        if tg_device in lc_device_data:
-            return True
-
-    def check_bonding_slave(self, slave, conect_data):
-        if slave in conect_data:
-            return True
+    def check_device(self, device_list, lc_device_data):
+        flag = True
+        for device in device_list:
+            if device not in lc_device_data:
+                print(f"没有{device}, 不能进行bond配置.")
+                flag = False
+        return flag
