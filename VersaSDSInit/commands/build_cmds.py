@@ -13,6 +13,7 @@ class BuildCommands():
 
     def setup_parser(self):
         parser_build = self.subp.add_parser("build",help="Configure the components of the pacemaker cluster")
+        parser_build.add_argument('-sp',default = 'pool0')
         parser_build.set_defaults(func=self.build_all)
 
         subp_build = parser_build.add_subparsers(dest='subargs_build')
@@ -41,15 +42,17 @@ class BuildCommands():
         p_ra = subp_build.add_parser('ra', help='build ra')
         p_ra.set_defaults(func=self.build_ra)
 
-        p_ra = subp_build.add_parser('pool', help='build pool')
-        p_ra.set_defaults(func=self.build_pool)
+        p_pool = subp_build.add_parser('pool', help='build pool')
+        p_pool.add_argument('-sp',default = 'pool0')
+        p_pool.set_defaults(func=self.build_pool)
 
         p_controller = subp_build.add_parser('controller' ,help='build HA linstor-controller')
+        p_controller.add_argument('-sp',default = 'pool0')
         p_controller.set_defaults(func=self.build_controller)
 
         p_drbd_attr = subp_build.add_parser('drbdattr', help='build drbd-attr')
         p_drbd_attr.set_defaults(func=self.build_drbd_attr)
-
+        
 
     def build_ip(self, args):
         controller = control.PacemakerConsole()
@@ -150,7 +153,7 @@ class BuildCommands():
         controller_linstor.create_conf_file()
         controller_linstor.create_nodes()
         print('创建节点成功')
-        controller_linstor.create_pools()
+        controller_linstor.create_pools(args.sp)
         print('*success*')
 
 
@@ -158,7 +161,10 @@ class BuildCommands():
         controller = control.LinstorConsole()
         print('*start*')
         print("start to build HA controller")
-        controller.build_ha_controller()
+        if args.sp:
+            controller.build_ha_controller(args.sp)
+        else:
+            controller.build_ha_controller()
         print('Finish configuration，checking')
         if not controller.check_ha_controller():
             print('Fail，exit')
@@ -179,7 +185,7 @@ class BuildCommands():
         controller_lvm = control.LVMConsole()
         controller_linstor = control.LinstorConsole()
 
-        # InstallCommands.install_software(args)
+        InstallCommands.install_software(args)
         print("1. 安装软件完成")
         self.build_pacemaker_cluster(args)
         print("2. 配置pacemaker集群完成")

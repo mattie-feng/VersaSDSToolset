@@ -519,11 +519,11 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         if not 'Connection refused' in cmd_result:
             return True
 
-    def pool0_is_exist(self,list_node):
-        cmd = 'linstor sp l -s pool0 | cat'
-        pool0_table = utils.exec_cmd(cmd,self.conn)
+    def pool_is_exist(self,list_node, sp):
+        cmd = f'linstor sp l -s {sp} | cat'
+        pool_table = utils.exec_cmd(cmd,self.conn)
         for node in list_node:
-            if not node in pool0_table:
+            if not node in pool_table:
                 return False
         return True
 
@@ -777,12 +777,12 @@ class Linstor():
         cmd = f'linstor node create {node} {ip}  --node-type Combined'
         utils.exec_cmd(cmd,self.conn)
 
-    def create_lvm_sp(self,node,vg):
-        cmd = f'linstor storage-pool create lvm {node} pool0 {vg}'
+    def create_lvm_sp(self,node,vg,sp):
+        cmd = f'linstor storage-pool create lvm {node} {sp} {vg}'
         utils.exec_cmd(cmd,self.conn)
 
-    def create_lvmthin_sp(self,node,lv):
-        cmd = f'linstor storage-pool create lvmthin {node} pool0 {lv}'
+    def create_lvmthin_sp(self,node,lv,sp):
+        cmd = f'linstor storage-pool create lvmthin {node} {sp} {lv}'
         utils.exec_cmd(cmd,self.conn)
 
     def install(self):
