@@ -346,7 +346,7 @@ class LinstorConsole():
 
 
     def backup_linstordb(self,timeout=30):
-        linstordb_path = 'ls -l /var/lib/linstor'
+        linstordb_path = '/var/lib/linstor'
         if self.conn.cluster['backup_path'].endswith('/'):
             backup_path = f"{self.conn.cluster['backup_path']}backup_{time.strftime('%Y%m%d%H%M')}"
         else:
