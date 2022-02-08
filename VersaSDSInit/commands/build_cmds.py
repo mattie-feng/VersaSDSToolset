@@ -153,7 +153,10 @@ class BuildCommands():
         controller_linstor.create_conf_file()
         controller_linstor.create_nodes()
         print('创建节点成功')
-        controller_linstor.create_pools(args.sp)
+        if args.sp:
+            controller_linstor.create_pools(args.sp)
+        else:
+            controller_linstor.create_pools()
         print('*success*')
 
 
@@ -194,7 +197,7 @@ class BuildCommands():
         controller_linstor.create_conf_file()
         controller_linstor.create_nodes()
         print('创建节点成功')
-        controller_linstor.create_pools()
+        controller_linstor.create_pools('pool0')
         print('创建存储池pool0成功')
         self.build_controller(args)
         print("3. HA Controller配置完成")
