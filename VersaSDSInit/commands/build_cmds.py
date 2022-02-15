@@ -86,12 +86,12 @@ class BuildCommands():
 
     def build_pacemaker(self, args):
         controller = control.PacemakerConsole()
-        print('start to set up packmaker')
-        controller.packmaker_conf_change()
-        if all(controller.check_packmaker()):
-            print('successfully configure packmaker')
+        print('start to set up pacemaker')
+        controller.pacmaker_conf_change()
+        if all(controller.check_pacemaker()):
+            print('successfully configure pacemaker')
         else:
-            print('failed to configure packmaker')
+            print('failed to configure pacemaker')
             sys.exit()
 
 
