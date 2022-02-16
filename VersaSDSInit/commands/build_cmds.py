@@ -86,12 +86,12 @@ class BuildCommands():
 
     def build_pacemaker(self, args):
         controller = control.PacemakerConsole()
-        print('start to set up packmaker')
-        controller.packmaker_conf_change()
-        if all(controller.check_packmaker()):
-            print('successfully configure packmaker')
+        print('start to set up pacemaker')
+        controller.pacmaker_conf_change()
+        if all(controller.check_pacemaker()):
+            print('successfully configure pacemaker')
         else:
-            print('failed to configure packmaker')
+            print('failed to configure pacemaker')
             sys.exit()
 
 
@@ -153,7 +153,10 @@ class BuildCommands():
         controller_linstor.create_conf_file()
         controller_linstor.create_nodes()
         print('创建节点成功')
-        controller_linstor.create_pools(args.sp)
+        if args.sp:
+            controller_linstor.create_pools(args.sp)
+        else:
+            controller_linstor.create_pools()
         print('*success*')
 
 
@@ -194,7 +197,7 @@ class BuildCommands():
         controller_linstor.create_conf_file()
         controller_linstor.create_nodes()
         print('创建节点成功')
-        controller_linstor.create_pools()
+        controller_linstor.create_pools('pool0')
         print('创建存储池pool0成功')
         self.build_controller(args)
         print("3. HA Controller配置完成")

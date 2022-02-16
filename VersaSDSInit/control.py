@@ -125,19 +125,19 @@ class PacemakerConsole():
             # pacemaker = action.Pacemaker(ssh)
             # pacemaker.restart()
     
-    def packmaker_conf_change(self):
+    def pacmaker_conf_change(self):
         cluster_name = self.conn.conf_file.get_cluster_name()
-        packmaker = action.Pacemaker()
-        packmaker.modify_cluster_name(cluster_name)
-        packmaker.modify_policy()
-        packmaker.modify_stickiness()
-        packmaker.modify_stonith_enabled()
+        pacemaker = action.Pacemaker()
+        pacemaker.modify_cluster_name(cluster_name)
+        pacemaker.modify_policy()
+        pacemaker.modify_stickiness()
+        pacemaker.modify_stonith_enabled()
 
 
-    def check_packmaker(self):
+    def check_pacemaker(self):
         # cluster_name = self.conn.cluster['cluster'] // cluster name 缺少日期，不进行判断
-        packmaker = action.Pacemaker()
-        if packmaker.check_crm_conf():
+        pacemaker = action.Pacemaker()
+        if pacemaker.check_crm_conf():
             return [True] * len(self.conn.list_ssh)
         else:
             return [False] * len(self.conn.list_ssh)
@@ -346,7 +346,7 @@ class LinstorConsole():
 
 
     def backup_linstordb(self,timeout=30):
-        linstordb_path = 'ls -l /var/lib/linstor'
+        linstordb_path = '/var/lib/linstor'
         if self.conn.cluster['backup_path'].endswith('/'):
             backup_path = f"{self.conn.cluster['backup_path']}backup_{time.strftime('%Y%m%d%H%M')}"
         else:
