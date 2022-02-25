@@ -11,7 +11,7 @@ class ClearCommands():
             'clear',
             help='clear VersaSDS configuration'
         )
-        parser_clear.add_argument('node',nargs = '?',default = None)
+        # parser_clear.add_argument('node',nargs = '?',default = None)
         subp_clear = parser_clear.add_subparsers(dest='subargs_clear')
 
         p_crm = subp_clear.add_parser('crm', help = 'clear crm cluster resource')
@@ -36,32 +36,32 @@ class ClearCommands():
         sc.clear_crm_res(args.node)
 
     @classmethod
-    def clear_crm_node(self,args):
+    def clear_crm_node(self):
         sc = control.PacemakerConsole()
         print("清除 crm 节点")
         sc.clear_crm_node()
 
 
     @classmethod
-    def clear_vg(self,args):
+    def clear_vg(self):
         sc = control.LVMConsole()
         print('清除 vg')
         sc.remove_vg()
 
     @classmethod
-    def clear_linstordb(self,args):
+    def clear_linstordb(self):
         controller = control.LinstorConsole()
         controller.destroy_linstordb()
 
 
     @classmethod
-    def clear_corosync(self,args):
+    def clear_corosync(self):
         sc = control.PacemakerConsole()
         print('恢复 corosync 配置文件')
         sc.recover_corosync_conf()
 
     @classmethod
-    def restart_linstor(self,args):
+    def restart_linstor(self):
         sc = control.LinstorConsole()
         print('重启 linstor 集群的 controller 和 satellite')
         sc.restart_linstor()
@@ -69,9 +69,9 @@ class ClearCommands():
     @classmethod
     def clear_all(self,args):
         print('*start*')
-        self.clear_crm(args)
-        self.clear_vg(args)
-        self.clear_corosync(args)
-        self.clear_crm_node(args)
-        self.restart_linstor(args)
+        self.clear_crm()
+        self.clear_vg()
+        self.clear_corosync()
+        self.clear_crm_node()
+        self.restart_linstor()
         print('*success*')
