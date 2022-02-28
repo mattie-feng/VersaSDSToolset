@@ -147,12 +147,9 @@ class Corosync():
         node_online = []
         while not node_online:
             data = utils.exec_cmd(cmd, self.conn)
-            print(data)
             node_online = re.findall('Online:\s\[(.*?)\]', data)
-            print("node_online:",node_online)
             if node_online:
                 node_online = node_online[0].strip().split(' ')
-                print(node_online)
                 if set(node_online) == set(nodes):
                     return True
                 else:
@@ -838,4 +835,4 @@ class LVM():
         utils.exec_cmd(cmd, self.conn)
 
     def remove_vg(self,vg):
-        print(utils.exec_cmd(f"vgremove -y {vg}",self.conn))
+        return utils.exec_cmd(f"vgremove -y {vg}",self.conn)
