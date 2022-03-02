@@ -237,7 +237,7 @@ class PacemakerConsole():
             ip_service = action.IpService(ssh)
             lst_up.append(ip_service.up_ip_service(node['private_ip']['device']))
 
-    def clear_crm_res(self,node):
+    def clear_crm_res(self,node=None):
         if node:
             for ssh, n in zip(self.conn.list_ssh, self.conn.cluster['node']):
                 if node == n['hostname']:
@@ -559,7 +559,9 @@ class LVMConsole():
             lvm = action.LVM(ssh)
             vol = node['lvm_device'].split("/")
             vg = vol[0]
-            lvm.remove_vg(vg)
+            result = lvm.remove_vg(vg)
+            if result:
+                print(result)
 
 
 
