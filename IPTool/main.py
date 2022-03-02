@@ -1,10 +1,9 @@
+# -*- coding: utf-8 -*-
 import argparse
 import sys
 import os
-import action
 
 sys.path.append('../')
-import utils
 import consts
 import control
 
@@ -24,6 +23,7 @@ class IPTool():
                                  action='store_true')
 
         parser_bonding = subp.add_parser("bonding", aliases=['b', 'bond'], help="Bonding operation")
+        self.parser_bonding = parser_bonding
         # parser_ip = subp.add_parser("ip", help="ip operation")
         subp_bonding = parser_bonding.add_subparsers()
 
@@ -48,7 +48,8 @@ class IPTool():
                                    '--mode',
                                    dest='mode',
                                    action='store',
-                                   choices=["balance-rr", "active-backup", "balance-xor", "broadcast", "802.3ad", "balance-tlb",
+                                   choices=["balance-rr", "active-backup", "balance-xor", "broadcast", "802.3ad",
+                                            "balance-tlb",
                                             "balance-alb"],
                                    required=True,
                                    help='Bonding mode')
@@ -77,27 +78,39 @@ class IPTool():
         parser_modify.add_argument('-m',
                                    '--mode',
                                    dest='mode',
-                                   choices=["balance-rr", "active-backup", "balance-xor", "broadcast", "802.3ad", "balance-tlb",
-                                            "balance-alb"],
-                                   required=True,
+                                   action='store',
+                                   choices=["balance-rr", "active-backup", "balance-xor", "broadcast", "802.3ad",
+                                            "balance-tlb", "balance-alb"],
                                    help='Bonding mode')
+        parser_modify.add_argument('-ip',
+                                   '--ip',
+                                   dest='ip',
+                                   action='store',
+                                   help='Bonding IP')
+        parser_modify.add_argument('-d',
+                                   '--device',
+                                   dest='device',
+                                   nargs='+',
+                                   action='store',
+                                   help='Bonding device')
 
         # Bonding function
         parser_apply.set_defaults(func=self.apply_file)
-        parser_delete.set_defaults(func=self.delete_bonding)
         parser_create.set_defaults(func=self.create_bonding)
+        parser_delete.set_defaults(func=self.delete_bonding)
         parser_modify.set_defaults(func=self.modify_mode)
+        parser_bonding.set_defaults(func=self.print_bond_help)
 
         self.parser.set_defaults(func=self.main_usage)
 
-    def print_help(self, args):
-        self.parser.print_help()
+    def print_bond_help(self, *args):
+        self.parser_bonding.print_help()
 
     def main_usage(self, args):
         if args.version:
             print(f'Version: {consts.VERSION}')
         else:
-            self.print_help(self.parser)
+            self.parser.print_help()
 
     def parse(self):  # 调用入口
         args = self.parser.parse_args()
@@ -105,7 +118,7 @@ class IPTool():
 
     def apply_file(self, args):
         bonding = control.Bonding()
-        bonding.create_bonding_by_file(args.file)
+        bonding.configure_bonding_by_file(args.file)
 
     def create_bonding(self, args):
         bonding = control.Bonding()
@@ -117,7 +130,12 @@ class IPTool():
 
     def modify_mode(self, args):
         bonding = control.Bonding()
-        bonding.modify_bonding_mode(args.node, args.bonding, args.mode)
+        if args.mode:
+            bonding.modify_bonding_mode(args.node, args.bonding, args.mode)
+        if args.ip:
+            bonding.modify_bonding_ip(args.node, args.bonding, args.ip)
+        if args.device:
+            bonding.modify_bonding_slave(args.node, args.bonding, args.device)
 
 
 def main():
