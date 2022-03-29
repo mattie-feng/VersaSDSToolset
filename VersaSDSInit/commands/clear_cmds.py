@@ -33,7 +33,10 @@ class ClearCommands():
     def clear_crm(self, args):
         sc = control.PacemakerConsole()
         print('清除 crm 集群的相关资源')
-        sc.clear_crm_res(args.node)
+        if args.subargs_clear:
+            sc.clear_crm_res(args.node)
+        else:
+            sc.clear_crm_res()
 
     def clear_crm_node(self, args):
         sc = control.PacemakerConsole()
@@ -52,10 +55,9 @@ class ClearCommands():
     #     controller.destroy_linstordb()
 
     def clear_corosync(self, args):
-        print("ss")
-        # sc = control.PacemakerConsole()
-        # print('恢复 corosync 配置文件')
-        # sc.recover_corosync_conf()
+        sc = control.PacemakerConsole()
+        print('恢复 corosync 配置文件')
+        sc.recover_corosync_conf()
 
     def restart_linstor(self, args):
         sc = control.LinstorConsole()
