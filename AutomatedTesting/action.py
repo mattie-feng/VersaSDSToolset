@@ -15,7 +15,7 @@ class RWData(object):
         result = utils.exec_cmd(cmd_ps, self.conn)
         re_string = f'\w*\s*(\d+)\s*.*dd if=/dev/urandom of={device} oflag=direct status=progress'
         if result["st"]:
-            re_result = utils.re_search(re_string, result["rt"], "groups")
+            re_result = utils.re_search(self.conn, re_string, result["rt"], "groups")
             if re_result:
                 pid = re_result[0]
                 cmd_kill = f'kill -9 {pid}'
@@ -149,7 +149,7 @@ class Stor(object):
         result = utils.exec_cmd(cmd, self.conn)
         re_string = 'quorum\s+majority.*\s*on\s*-\s*no\s*-\s*quorum\s+io\s*-\s*error'
         if result["st"]:
-            re_result = utils.re_search(re_string, result["rt"], "bool")
+            re_result = utils.re_search(self.conn, re_string, result["rt"], "bool")
             return re_result
 
     def primary_drbd(self, resource):
@@ -212,7 +212,7 @@ class Stor(object):
         result = utils.exec_cmd(cmd, self.conn)
         re_string = '/dev/drbd\d+'
         if result["st"]:
-            re_result = utils.re_search(re_string, result["rt"], "group")
+            re_result = utils.re_search(self.conn, re_string, result["rt"], "group")
             return re_result
 
     def get_linstor_res(self, resource):
@@ -223,7 +223,7 @@ class Stor(object):
 
     def check_vtel_result(self, result):
         re_string = f'SUCCESS|successfully created'
-        re_result = utils.re_search(re_string, result, "bool")
+        re_result = utils.re_search(self.conn, re_string, result, "bool")
         return re_result
 
 
