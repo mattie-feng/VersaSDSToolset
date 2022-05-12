@@ -10,17 +10,17 @@ class RWData(object):
         utils.prt_log(self.conn, f"Start dd on {utils.get_global_dict_value(self.conn)}.", 0)
         utils.exec_cmd(cmd, self.conn)
 
-    def kill_dd(self, device):
-        cmd_ps = 'ps -ef | grep dd'
-        result = utils.exec_cmd(cmd_ps, self.conn)
-        re_string = f'\w*\s*(\d+)\s*.*dd if=/dev/urandom of={device} oflag=direct status=progress'
+    def get_dd(self):
+        cmd = 'ps -ef | grep dd'
+        result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            re_result = utils.re_search(self.conn, re_string, result["rt"], "groups")
-            if re_result:
-                pid = re_result[0]
-                cmd_kill = f'kill -9 {pid}'
-                utils.exec_cmd(cmd_kill, self.conn)
-                utils.prt_log(self.conn, f"Kill dd on {utils.get_global_dict_value(self.conn)}.", 0)
+            return result["rt"]
+
+    def kill_dd(self, pid):
+        cmd = f'kill -9 {pid}'
+        result = utils.exec_cmd(cmd, self.conn)
+        if result["st"]:
+            return True
 
 
 class IpService(object):

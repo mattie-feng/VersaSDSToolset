@@ -59,11 +59,36 @@ def check_drbd_status(conn, result, resource):
         return re_result
 
 
+def check_drbd_no_quorum(conn, result):
+    re_string = 'quorum:no'
+    if result:
+        re_result = utils.re_search(conn, re_string, result)
+        return re_result
+
+
 def check_drbd_conns_status(conn, result):
     re_string = r'([a-zA-Z0-9_-]+).*\d+\s*\|\s*[a-zA-Z]*\s*\|\s*([a-zA-Z0-9()]*)\s*\|\s*([a-zA-Z]*)\s*\|'
     if result:
         re_result = utils.re_findall(conn, re_string, result)
         return re_result
+
+
+def get_dd_pid(conn, device, result):
+    re_string = f'\w*\s*(\d+)\s*.*dd if=/dev/urandom of={device} oflag=direct status=progress'
+    re_result = utils.re_search(conn, re_string, result, "groups")
+    if re_result:
+        return re_result[0]
+
+
+def kill_dd(conn, device):
+    dd_node = action.RWData(conn)
+    result = dd_node.get_dd()
+    pid = get_dd_pid(conn, device, result)
+    if pid:
+        dd_node.kill_dd(pid)
+        utils.prt_log(conn, f"Kill dd on {utils.get_global_dict_value(conn)}.", 0)
+    else:
+        utils.prt_log(conn, f"dd operation had been finished.", 0)
 
 
 class Connect(object):
@@ -166,35 +191,40 @@ class QuorumAutoTest(object):
             utils.prt_log(vtel_conn, f'Abnormal quorum status of {resource}', 1)
             self.get_log()
             self.delete_linstor_resource(vtel_conn, sp, resource)
-            utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect dmesg and exit testing ...", 2)
+            utils.prt_log('', f"Finished to collect dmesg and exit testing ...", 2)
         if not self.cycle_check_drbd_status(resource):
             self.get_log()
             self.delete_linstor_resource(vtel_conn, sp, resource)
-            utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect dmesg and exit testing ...", 2)
+            utils.prt_log('', f"Finished to collect dmesg and exit testing ...", 2)
         device_name = stor_obj.get_device_name(resource)
         device_list = [vplx_config["private_ip"]["device"] for vplx_config in self.vplx_configs]
         if use_case == 1:
             test_conn_list = zip(self.conn.list_vplx_ssh, self.conn.list_vplx_ssh[1:] + self.conn.list_vplx_ssh[:1])
+            mode_total_test_times = 3
         if use_case == 2:
             test_conn_list = [(self.conn.list_vplx_ssh[0], self.conn.list_vplx_ssh[1]),
                               (self.conn.list_vplx_ssh[2], self.conn.list_vplx_ssh[1])]
+            mode_total_test_times = 2
             device_list.pop(1)
         mode_times = 0
+        total_times = mode_total_test_times * test_times
         for conn_list in test_conn_list:
             device = device_list.pop(0)
             node_a = utils.get_global_dict_value(conn_list[0])
             node_b = utils.get_global_dict_value(conn_list[1])
-            mode_str = f"\nMode:({node_a}, {node_b})"
+            stor_a = action.Stor(conn_list[0])
+            stor_b = action.Stor(conn_list[1])
+            ip_a = action.IpService(conn_list[0])
+            dd_a = action.RWData(conn_list[0])
+            dd_b = action.RWData(conn_list[1])
+            mode_str = f"\nMode:({node_a}, {node_b}). Mode expect test times: {mode_total_test_times}."
             utils.prt_log('', mode_str, 0)
             for i in range(test_times):
                 times = utils.get_times() + 1
                 utils.set_times(times)
-                utils.prt_log('', f"\n{mode_str} test times: {i + 1}. Total test times: {times}.", 0)
-                stor_a = action.Stor(conn_list[0])
-                stor_b = action.Stor(conn_list[1])
-                ip_a = action.IpService(conn_list[0])
-                dd_a = action.RWData(conn_list[0])
-                dd_b = action.RWData(conn_list[1])
+                utils.prt_log('',
+                              f"\n{mode_str} test times: {i + 1}. Current test times: {times}. Expect test times: {total_times}.",
+                              0)
                 stor_a.primary_drbd(resource)
                 utils.prt_log(conn_list[0], f"Primary resource on {node_a} ...", 0)
                 time.sleep(3)
@@ -216,21 +246,26 @@ class QuorumAutoTest(object):
                 time.sleep(3)
                 thread3.start()
                 time.sleep(10)
-                dd_a.kill_dd(device_name)
-                if thread1.is_alive():
-                    stop_thread(thread1)
+                resource_status_result = stor_a.get_drbd_status(resource)
+                if check_drbd_no_quorum(conn_list[0], resource_status_result):
+                    kill_dd(conn_list[0], device_name)
+                    if thread1.is_alive():
+                        stop_thread(thread1)
+                else:
+                    utils.prt_log(conn_list[0], f"Configuration 'quorum:no' not exist ...", 0)
+                    self.get_log()
+                    self.email.send_autotest_mail()
+                    utils.prt_log('', f"Finished to collect dmesg and exit testing ...", 2)
                 thread4.start()
                 utils.prt_log(conn_list[0], f"Secondary resource on {node_a} ...", 0)
                 thread4.join()
                 thread1.join()
                 time.sleep(10)
-                dd_b.kill_dd(device_name)
+                kill_dd(conn_list[1], device_name)
                 time.sleep(5)
                 if thread3.is_alive():
                     stop_thread(thread3)
                     time.sleep(5)
-                else:
-                    utils.prt_log(conn_list[1], f"dd operation had been finished", 1)
                 thread3.join()
                 ip_a.up_device(device)
                 utils.prt_log(conn_list[0], f"Up {device} on {node_a}  ...", 0)
@@ -241,7 +276,7 @@ class QuorumAutoTest(object):
                     stor_b.secondary_drbd(resource)
                     self.delete_linstor_resource(vtel_conn, sp, resource)
                     self.email.send_autotest_mail()
-                    utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect dmesg and exit testing ...", 2)
+                    utils.prt_log('', f"Finished to collect dmesg and exit testing ...", 2)
                 stor_b.secondary_drbd(resource)
                 utils.prt_log(conn_list[1], f"Secondary resource on {node_b} ...", 0)
                 if times == mode_times * test_times + 1:
@@ -376,11 +411,11 @@ class IscsiTest(object):
                                                 self.conn.list_vplx_ssh[0]):
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
                 self.email.send_autotest_mail()
-                utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report and exit testing ...", 2)
+                utils.prt_log('', f"Finished to collect crm_report and exit testing ...", 2)
             if not self.check_drbd_status(resource):
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
                 self.email.send_autotest_mail()
-                utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report and exit testing ...", 2)
+                utils.prt_log('', f"Finished to collect crm_report and exit testing ...", 2)
             utils.prt_log(self.conn.list_vplx_ssh[0], f"Down {device} on {ip_node} ...", 0)
             ip_obj.down_device(device)
             time.sleep(40)
@@ -390,7 +425,7 @@ class IscsiTest(object):
                 time.sleep(30)
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
                 self.email.send_autotest_mail()
-                utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report and exit testing ...", 2)
+                utils.prt_log('', f"Finished to collect crm_report and exit testing ...", 2)
             utils.prt_log(self.conn.list_vplx_ssh[0], f"Up {device} on {ip_node} ...", 0)
             ip_obj.up_device(device)
             ip_obj.netplan_apply()
@@ -398,7 +433,7 @@ class IscsiTest(object):
             if not self.check_drbd_status(resource):
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
                 self.email.send_autotest_mail()
-                utils.prt_log(self.conn.list_vplx_ssh[0], f"Finished to collect crm_report and exit testing ...", 2)
+                utils.prt_log('', f"Finished to collect crm_report and exit testing ...", 2)
             self.restore_resource(resource)
             if i == 1:
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
