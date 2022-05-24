@@ -23,11 +23,10 @@ class NetworkManagerService(object):
 
     def modify_renderer(self):
         netplan_file = utils.get_file("/etc/netplan", "yaml")
-        cmd = f"sed -i 's/renderer: networkd/renderer: NetworkManager/g' /etc/netplan/{netplan_file[0]}"
+        cmd = f"sed -i 's/renderer: networkd/renderer: NetworkManager/g;/ethernets/,$d' /etc/netplan/{netplan_file[0]}"
         result = utils.exec_cmd(cmd)
         if result["st"]:
             return True
-        pass
 
     def modify_config(self):
         cmd = f"sed -i 's/^managed=false/#managed=false\\nmanaged=true/g' /etc/NetworkManager/NetworkManager.conf"
