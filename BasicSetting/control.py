@@ -1,6 +1,18 @@
 # -*- coding:utf-8 -*-
 import action
 import sys
+import re
+
+
+def get_device_connection(device, result):
+    """
+    @param device: device name
+    @param result: result for nmcli connection show command
+    @return: UUID of connection about device
+    """
+    re_obj = re.search(r'(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})\s+(\S+)\s+' + device, result)
+    if re_obj:
+        return re_obj.group(1)
 
 
 def set_nmcli_config():
@@ -57,13 +69,18 @@ def set_root_pwd(conf_args):
 def set_local_ip(conf_args):
     """连接IP的设置的功能"""
     ip_service = action.IpService()
-    print(f"Start to set {conf_args['IP']} on the {conf_args['Device']}")
     ssh_service = action.SystemService()
+    print(f"Start to set {conf_args['IP']} on the {conf_args['Device']}")
+    connection_detail = ip_service.get_connection()
+    connection = get_device_connection(conf_args['Device'], connection_detail)
     if ip_service.set_local_ip(conf_args['Device'], conf_args['IP'], conf_args['Gateway']):
         ip_service.up_local_ip_service(conf_args['Device'])
         print(" Start to restart openssh service")
         ssh_service.oprt_ssh_service("restart")
         print(f"Finish to set {conf_args['IP']} on the {conf_args['Device']}")
+    if connection:
+        print(f"** Clear old configuration on {conf_args['Device']}")
+        ip_service.del_connect(connection)
 
 
 def set_hostname(conf_args):
