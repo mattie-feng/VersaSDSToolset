@@ -80,7 +80,7 @@ class IpService(object):
     def set_local_ip(self, device, ip, gateway, netmask=24):
         """设置连接的IP地址"""
         connection_name = 'vtel_' + device
-        cmd = f"nmcli connection add con-name {connection_name} type ethernet ifname {device} ipv4.addresses {ip}/{netmask} ipv4.gateway {gateway} ipv4.dns 114.114.114.114 ipv4.method manual"
+        cmd = f"nmcli connection add con-name {connection_name} type ethernet ifname {device} ipv4.addresses {ip}/{netmask} ipv4.gateway {gateway} ipv4.dns '114.114.114.114 8.8.8.8' ipv4.method manual ipv6.method ignore"
         result = utils.exec_cmd(cmd)
         if result["st"]:
             return True
@@ -92,6 +92,21 @@ class IpService(object):
         result = utils.exec_cmd(cmd)
         if result["st"]:
             return True
+
+    def get_connection(self):
+        """get all the connection,return a string"""
+        cmd = f"nmcli connection show"
+        result = utils.exec_cmd(cmd)
+        if result:
+            return result["rt"]
+
+    def del_connect(self, name):
+        cmd = f"nmcli connection delete {name}"
+        result = utils.exec_cmd(cmd)
+        if result:
+            if result["st"]:
+                return True
+        return False
 
 
 class RootConfig(object):
