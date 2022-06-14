@@ -28,7 +28,7 @@ def exec_cmd(cmd):
         result = p.stdout
         result = result.decode() if isinstance(result, bytes) else result
         # print("result", result)
-        return {"st": True, "rt": result}
+        return {"st": True, "rt": result.rstrip('\n')}
     else:
         print(f"  Failed to execute command: {cmd}")
         print("  Error message:\n", p.stderr)
