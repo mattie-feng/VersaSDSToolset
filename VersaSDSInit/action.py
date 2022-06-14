@@ -190,7 +190,7 @@ class Pacemaker(object):
         if not re_stonith_enabled or re_stonith_enabled[0] != 'false':
             return
 
-        if not re_policy or re_policy[0] not in ['ignore', 'stopped']:
+        if not re_policy or re_policy[0] not in ['ignore', 'stop']:
             return
 
         if not re_resource_stickiness or re_resource_stickiness[0] != '1000':
@@ -219,10 +219,13 @@ class Pacemaker(object):
         utils.exec_cmd("crm res stop g_linstor p_fs_linstordb p_linstor-controller", self.conn)
         utils.exec_cmd("crm res stop ms_drbd_linstordb p_drbd_linstordb", self.conn)
         utils.exec_cmd("crm res stop drbd-attr", self.conn)
+        utils.exec_cmd("crm res stop vipcontroller", self.conn)
         time.sleep(2)
         utils.exec_cmd("crm conf del g_linstor p_fs_linstordb p_linstor-controller", self.conn)
         utils.exec_cmd("crm conf del g_linstor ms_drbd_linstordb p_drbd_linstordb", self.conn)
         utils.exec_cmd("crm conf del drbd-attr", self.conn)
+        utils.exec_cmd("crm conf del vipcontroller", self.conn)
+
 
     def clear_crm_node(self, node):
         utils.exec_cmd(f"crm conf del {node}", self.conn)
@@ -464,7 +467,7 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         """
         E.g: backup_path = 'home/samba' 文件夹
         """
-        if 'No such file or directory' in utils.exec_cmd("ls", self.conn):
+        if 'No such file or directory' in utils.exec_cmd(f"ls {backup_path}", self.conn):
             utils.exec_cmd(f'mkdir -p {backup_path}', self.conn)
         if not backup_path.endswith('/'):
             backup_path += '/'

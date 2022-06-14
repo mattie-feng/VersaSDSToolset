@@ -106,7 +106,7 @@ class InstallCommands(object):
         cls.install_linbit(args)
         cls.install_lvm2(args)
         cls.install_pacemaker(args)
-        cls.install_targetcli(args)
+        # cls.install_targetcli(args)
         print('* Success in installing software *')
 
     @classmethod

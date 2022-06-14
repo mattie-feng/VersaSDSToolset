@@ -129,9 +129,11 @@ class BuildCommands(object):
         controller_lvm.create_dirver_pool()
         print(' Success in creating PV/VG/LV')
         controller_linstor.create_conf_file()
+        print(' Success in creating linstor-client.conf')
         controller_linstor.create_nodes()
         print(' Success in creating Node')
         controller_linstor.create_pools(args.sp)
+        print(f' Success in creating storagepool {args.sp}')
         print('* Success *')
 
     def build_controller(self, args):
@@ -147,26 +149,15 @@ class BuildCommands(object):
 
     def build_drbd_attr(self, args):
         print('* Start to build drbd_attr*')
-        pcm = control.Pacemaker()
+        pcm = control.PacemakerConsole()
         pcm.set_drbd_attr()
-        print('*Success*')
+        print('* Success *')
 
     def build_all(self, args):
-        controller_lvm = control.LVMConsole()
-        controller_linstor = control.LinstorConsole()
-
         InstallCommands.install_software(args)
-        print("1. Complete software installation")
+        print("1. Complete software installation\n")
         self.build_pacemaker_cluster(args)
-        print("2. Complete Pacemaker cluster configuration")
-        controller_lvm.create_dirver_pool()
-        print(' Success in creating PV/VG/LV')
-        controller_linstor.create_conf_file()
-        controller_linstor.create_nodes()
-        print(' Success in creating PV/VG/LV')
-        controller_linstor.create_pools(args.sp)
-        print(f' Success in creating storagepool {args.sp}')
+        print("2. Complete Pacemaker cluster configuration\n")
+        self.build_pool(args)
         self.build_controller(args)
-        print("3. Complete HA Controller configuration")
-        self.build_drbd_attr(args)
-        print("4. Complete drbd-attr configuration")
+        print("3. Complete HA Controller configuration\n")

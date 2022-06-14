@@ -173,12 +173,10 @@ class PacemakerConsole(object):
             check_result.append(executor.check_status("linstor-satellite"))
             check_result.append(executor.check_status("pacemaker"))
             check_result.append(executor.check_status("corosync"))
-            print(check_result)
             if check_result == ['disabled', 'disabled', 'enabled', 'enabled', 'enabled']:
                 lst.append(True)
             else:
                 lst.append(False)
-        print(lst)
         return lst
 
     # TODO get RA from FreeNAS
@@ -286,6 +284,7 @@ class LinstorConsole(object):
             ha_controller = action.HALinstorController(ssh)
             if ha_controller.is_active_controller():
                 ha_controller.stop_controller()
+                time.sleep(3)
                 ha_controller.backup_linstor(backup_path)  # 要放置备份文件的路径（文件夹）
                 ha_controller.move_database(backup_path)
 
@@ -303,7 +302,7 @@ class LinstorConsole(object):
             ha_controller = action.HALinstorController(ssh)
             ha_controller.modify_satellite_service()  # linstor satellite systemd 配置
 
-    def check_ha_controller(self, timeout=30):
+    def check_ha_controller(self, timeout=60):
         ha = action.HALinstorController(self.default_ssh)
 
         node_list = self.conn.list_hostname
@@ -316,7 +315,7 @@ class LinstorConsole(object):
             if timeout and seconds_passed > timeout:
                 print("Linstor controller status error")
                 return False
-            time.sleep(1)
+            time.sleep(2)
 
         for ssh in self.conn.list_ssh:
             ha = action.HALinstorController(ssh)

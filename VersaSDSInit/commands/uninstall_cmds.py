@@ -54,5 +54,5 @@ class UninstallCommands(object):
         self.uninstall_lvm2(args)
         self.uninstall_linbit(args)
         self.uninstall_pacemaker(args)
-        self.uninstall_targetcli(args)
+        # self.uninstall_targetcli(args)
         print('* Success in uninstalling software *')
