@@ -302,7 +302,7 @@ class LinstorConsole(object):
             ha_controller = action.HALinstorController(ssh)
             ha_controller.modify_satellite_service()  # linstor satellite systemd 配置
 
-    def check_ha_controller(self, timeout=60):
+    def check_ha_controller(self, timeout=120):
         ha = action.HALinstorController(self.default_ssh)
 
         node_list = self.conn.list_hostname

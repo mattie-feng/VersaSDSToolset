@@ -15,7 +15,7 @@ class BackupCommands(object):
         )
         subp_build = parser_backup.add_subparsers(dest='subargs_backup')
 
-        p_linstordb = subp_build.add_parser('linstordb', help='back linstordb')
+        p_linstordb = subp_build.add_parser('linstordb', help='backup linstordb')
         p_linstordb.set_defaults(func=self.backup_linstordb)
 
     def backup_linstordb(self, args):
