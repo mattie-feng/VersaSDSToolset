@@ -88,4 +88,8 @@ def set_hostname(conf_args):
     print('Start to modify hostname')
     system_service.modify_hostname(conf_args["Hostname"])
     system_service.modify_hostsfile('127.0.1.1', conf_args["Hostname"])
-    print(f"Finish to modify hostname")
+    lc_hostname = system_service.get_hostname()
+    if lc_hostname == conf_args["Hostname"]:
+        print(f"Finish to modify hostname to {lc_hostname}")
+    else:
+        print(f"Hostname is {lc_hostname}. Something is wrong, please check.")
