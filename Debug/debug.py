@@ -146,12 +146,13 @@ class ConfFile():
             with open(self.yaml_file, 'r', encoding='utf-8') as f:
                 yaml_dict = yaml.safe_load(f)
             if 'logfilepath' not in yaml_dict : #此处判断是否有logfilepath这个key，若没有则创建
-                yaml_dict['logfilepath'] = '/var/log'
+                yaml_dict['logfilepath'] = '/var/log/debugfiles'
+                return yaml_dict
             else:
                 if yaml_dict['logfilepath'] :   #此处进行判断logfilepath的value是否为空，若为空则添加默认路径
                     return yaml_dict
                 else:
-                    yaml_dict['logfilepath'] = "/var/log"
+                    yaml_dict['logfilepath'] = "/var/log/debugfiles"
                     return yaml_dict
         except FileNotFoundError:
             print(f"Please check the file name: {self.yaml_file}")
