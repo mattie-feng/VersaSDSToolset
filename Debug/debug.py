@@ -117,7 +117,7 @@ class SSHConn(object):
     def ssh_connect(self):
         self._connect()
         if not self.SSHConnection:
-            print('Connect retry for SAN switch "%s" ...' % self._host)
+            print(f'Connect retry for SAN switch "%s" ... % {self._host}')
             self._connect()
 
     def exec_cmd(self, command):
@@ -145,9 +145,16 @@ class ConfFile():
         try:
             with open(self.yaml_file, 'r', encoding='utf-8') as f:
                 yaml_dict = yaml.safe_load(f)
-            return yaml_dict
+            if 'logfilepath' not in yaml_dict : #此处判断是否有logfilepath这个key，若没有则创建
+                yaml_dict['logfilepath'] = '/var/log'
+            else:
+                if yaml_dict['logfilepath'] :   #此处进行判断logfilepath的value是否为空，若为空则添加默认路径
+                    return yaml_dict
+                else:
+                    yaml_dict['logfilepath'] = "/var/log"
+                    return yaml_dict
         except FileNotFoundError:
-            print("Please check the file name:", self.yaml_file)
+            print(f"Please check the file name: {self.yaml_file}")
         except TypeError:
             print("Error in the type of file name.")
 
@@ -246,13 +253,18 @@ class Console:
     #         # print(f"node: {node['hostname']}")
     #         print(show_tree(self.logfiledir, ssh))
 
+def collect_(args):
+    print("处理LINBIT的log")
+    worker.save_linbit_file()
+    print("处理DRBD的log")
+    worker.save_drbd_file()
+    print("处理CRM的log")
+    worker.save_crm_file()
+    print("处理结束")
 
-if __name__ == "__main__":
-    worker = Console()
-    path = worker.logfilepath
 
-
-    def collect_(args):
+def collect(args):
+    if not args.soft:
         print("处理LINBIT的log")
         worker.save_linbit_file()
         print("处理DRBD的log")
@@ -260,45 +272,40 @@ if __name__ == "__main__":
         print("处理CRM的log")
         worker.save_crm_file()
         print("处理结束")
+    else:
+        for soft in args.soft:
+            if soft == 'LINBIT':
+                print("处理LINBIT的log")
+                worker.save_linbit_file()
+            elif soft == 'DRBD':
+                print("处理DRBD的log")
+                worker.save_drbd_file()
+            elif soft == 'CRM':
+                print("处理CRM的log")
+                worker.save_crm_file()
 
 
-    def collect(args):
-        if not args.soft:
-            print("处理LINBIT的log")
-            worker.save_linbit_file()
-            print("处理DRBD的log")
-            worker.save_drbd_file()
-            print("处理CRM的log")
-            worker.save_crm_file()
-            print("处理结束")
-        else:
-            for soft in args.soft:
-                if soft == 'LINBIT':
-                    print("处理LINBIT的log")
-                    worker.save_linbit_file()
-                elif soft == 'DRBD':
-                    print("处理DRBD的log")
-                    worker.save_drbd_file()
-                elif soft == 'CRM':
-                    print("处理CRM的log")
-                    worker.save_crm_file()
+def show(args):
+    if args.node:
+        print(show_tree(path, args.node, args.soft))
+    elif args.node is None and args.soft is None:
+        print(show_tree_all(path))
+    else:
+        print("请指定节点")
 
+    if args.path:
+        print(show_tree_all(args.path))
+    else:
+        pass
 
-    def show(args):
-        if args.node:
-            print(show_tree(path, args.node, args.soft))
-        elif args.node is None and args.soft is None:
-            print(show_tree_all(path))
-        else:
-            print("请指定节点")
-
-
+def arg():
     parser = argparse.ArgumentParser(description='collect debug message')
     sub_parser = parser.add_subparsers()
     parser_show = sub_parser.add_parser("show", aliases=["s"])
     parser_collect = sub_parser.add_parser("collect", aliases=["c"])
 
     parser_show.add_argument('--node', '-n')
+    parser_show.add_argument('--path', '-p',default='/var/log')
     parser_show.add_argument('--soft', '-s', nargs='*', choices=['LINBIT', 'DRBD', 'CRM'])
     parser_collect.add_argument('--soft', '-s', nargs='*', choices=['LINBIT', 'DRBD', 'CRM'])
 
@@ -306,10 +313,18 @@ if __name__ == "__main__":
     parser_collect.set_defaults(func=collect)
     parser.set_defaults(func=collect_)
 
-
-    # 启动
     args = parser.parse_args()
     args.func(args)
+
+    return args
+
+
+if __name__ == "__main__":
+    worker = Console()
+    path = worker.logfilepath
+
+    # 启动
+    args = arg()
 
     # 取出数据
     # for ssh in list_ssh_data:
