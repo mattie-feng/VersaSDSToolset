@@ -117,7 +117,7 @@ class SSHConn(object):
     def ssh_connect(self):
         self._connect()
         if not self.SSHConnection:
-            print(f'Connect retry for SAN switch "%s" ... % {self._host}')
+            print(f'Connect retry for  ...  {self._host}')
             self._connect()
 
     def exec_cmd(self, command):
@@ -228,7 +228,7 @@ class Console:
             save_linbit_file(linbit_path, ssh)
             if ssh:
                 file_source = f"{self.logfilepath}/{node['hostname']}"
-                scp_file(file_source, self.file_target, ssh)
+                scp_file(self.file_target, file_source, ssh)
 
     def save_drbd_file(self):
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
@@ -237,7 +237,7 @@ class Console:
             save_drbd_file(drbd_path, ssh)
             if ssh:
                 file_source = f"{self.logfilepath}/{node['hostname']}"
-                scp_file(file_source, self.file_target, ssh)
+                scp_file(self.file_target, file_source, ssh)
 
     def save_crm_file(self):
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
@@ -247,7 +247,7 @@ class Console:
             tar_crm_file(crm_path, ssh)
             if ssh:
                 file_source = f"{self.logfilepath}/{node['hostname']}"
-                scp_file(file_source, self.file_target, ssh)
+                scp_file(self.file_target, file_source, ssh)
 
     # def show_tree(self):
     #     for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
