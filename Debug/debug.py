@@ -292,13 +292,15 @@ def show(args):
         print(show_tree(path, args.node, args.soft))
     elif args.node is None and args.soft is None:
         print(show_tree_all(path))
+    elif args.path is not None:
+        print(show_tree_all(args.path))
     else:
         print("请指定节点")
 
-    if args.path:
-        print(show_tree_all(args.path))
-    else:
-        pass
+    # if args.path:
+    #     print(show_tree_all(args.path))
+    # else:
+    #     pass
 
 def arg():
     parser = argparse.ArgumentParser(description='collect debug message')
