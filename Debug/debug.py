@@ -84,7 +84,7 @@ def mkdir(path, ssh_obj=None):
 
 
 def scp_file(file_source, file_target, ssh_obj=None):
-    cmd = f"scp -r {file_source} {file_target}"
+    cmd = f"scp -r {file_source} {file_target}" #scp传输格式：scp [可选参数] file_source file_target
     exec_cmd(cmd, ssh_obj)
 
 
@@ -215,20 +215,20 @@ class Console:
         self.logfilepath = self.conn.cluster['logfilepath']
         self.file_target = self._get_file_target()
 
-    def _get_file_target(self):
+    def _get_file_target(self): #此处返回的file_target应为本机的ip地址
         local_ip = self.conn.get_host_ip()
-        for node in self.conn.cluster['node']:
-            if local_ip == node['public_ip']:
-                return f"root@{node['public_ip']}:{self.logfilepath}/"
+        # for node in self.conn.cluster['node']:
+        #     if local_ip == node['public_ip']:
+        return f"root@{local_ip}:{self.logfilepath}/"
 
     def save_linbit_file(self):
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
             linbit_path = get_path(self.logfilepath, node['hostname'], 'LINBIT')
             mkdir(linbit_path, ssh)
-            save_linbit_file(linbit_path, ssh)
-            if ssh:
+            save_linbit_file(linbit_path, ssh)  #至此，遍历需要搜集日志的节点信息，完成在日志搜集节点创建日志存放目录并将日志存放在目录中
+            if ssh: #意义不明，ssh什么情况下才会出现非空的情况
                 file_source = f"{self.logfilepath}/{node['hostname']}"
-                scp_file(self.file_target, file_source, ssh)
+                scp_file(file_source, self.file_target, ssh)
 
     def save_drbd_file(self):
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
@@ -237,7 +237,7 @@ class Console:
             save_drbd_file(drbd_path, ssh)
             if ssh:
                 file_source = f"{self.logfilepath}/{node['hostname']}"
-                scp_file(self.file_target, file_source, ssh)
+                scp_file(file_source, self.file_target, ssh)
 
     def save_crm_file(self):
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
@@ -247,7 +247,7 @@ class Console:
             tar_crm_file(crm_path, ssh)
             if ssh:
                 file_source = f"{self.logfilepath}/{node['hostname']}"
-                scp_file(self.file_target, file_source, ssh)
+                scp_file(file_source, self.file_target, ssh)
 
     # def show_tree(self):
     #     for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
@@ -255,13 +255,14 @@ class Console:
     #         print(show_tree(self.logfiledir, ssh))
 
 def collect_(args):
-    print("处理LINBIT的log")
-    worker.save_linbit_file()
-    print("处理DRBD的log")
-    worker.save_drbd_file()
-    print("处理CRM的log")
-    worker.save_crm_file()
-    print("处理结束")
+    # print("处理LINBIT的log")
+    # worker.save_linbit_file()
+    # print("处理DRBD的log")
+    # worker.save_drbd_file()
+    # print("处理CRM的log")
+    # worker.save_crm_file()
+    # print("处理结束")
+    print("请输入python3 debug.py -h以获取帮助信息")
 
 
 def collect(args):
