@@ -1,44 +1,50 @@
-import control
+import argparse
 import sys
 
+sys.path.append('../')
+import consts
+
+from commands import BuildCommands
 
 
-controller = control.KSConsole()
+class VersaKBSTools(object):
+    def __init__(self):
+        self.parser = argparse.ArgumentParser(prog='main')
+        self.subp = self.parser.add_subparsers(metavar='', dest='subargs_init')
+        self._build_cmds = BuildCommands(self.subp)
+        self.setup_parser()
 
-if len(sys.argv) == 2 and sys.argv[1] == 'kk':
-    print("运行kk")
-    controller.modify_kk()
-    controller.buidl_ks()
+    def setup_parser(self):
+        self.parser.add_argument('-v',
+                                 '--version',
+                                 dest='version',
+                                 help='Show current version',
+                                 action='store_true')
+        self.parser.set_defaults(func=self.main_usage)
 
-elif len(sys.argv) == 2 and sys.argv[1] == 'vip':
-    print("配置HAproxy")
-    controller.install_haproxy()
-    controller.modify_haproxy()
-    controller.restart_haproxy()
+    def print_help(self, args):
+        self.parser.print_help()
 
-    print("配置Keepalived")
-    controller.install_keepalived()
-    controller.modify_keepalived()
-    controller.restart_keepalived()
-elif len(sys.argv) > 2:
-    print("输入参数kk/vip，或者不输入参数执行全部流程")
+    def main_usage(self, args):
+        if args.version:
+            print(f'Version: {consts.VERSION}')
+        else:
+            self.print_help(self.parser)
 
-else:
-    print("配置HAproxy")
-    controller.install_haproxy()
-    controller.modify_haproxy()
-    controller.restart_haproxy()
-
-    print("配置Keepalived")
-    controller.install_keepalived()
-    controller.modify_keepalived()
-    controller.restart_keepalived()
-
-    print("安装KK配置KS集群")
-    controller.install_docker()
-    controller.install_kk()
-    controller.modify_kk()
-    controller.buidl_ks()
+    def parse(self):  # 调用入口
+        args = self.parser.parse_args()
+        args.func(args)
 
 
+def main():
+    try:
+        cmd = VersaKBSTools()
+        cmd.parse()
+    except KeyboardInterrupt:
+        sys.stderr.write("\nClient exiting (received SIGINT)\n")
+    except PermissionError:
+        sys.stderr.write("\nPermission denied (log file or other)\n")
 
+
+if __name__ == '__main__':
+    main()
