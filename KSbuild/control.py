@@ -85,10 +85,7 @@ class KSConsole(object):
             lst.append(gevent.spawn(handler.install_docker, flag))
         gevent.joinall(lst)
 
-    def install(self, flag):
-        if flag:
-            self.replace_linbit_sources()
-            self.apt_update()
+    def install(self):
         for ssh in self.conn.list_all_ssh:
             handler = action.VersaKBS(ssh)
             handler.install()
@@ -97,6 +94,11 @@ class KSConsole(object):
             handler.install()
         handler = action.VersaKBS(self.default_ssh)
         handler.install_kk()
+
+    def sync_time(self):
+        for ssh in self.conn.list_all_ssh:
+            handler = action.VersaSDS(ssh)
+            handler.sync_time()
 
     def modify_haproxy(self):
         lst = []
@@ -237,6 +239,11 @@ class KSConsole(object):
         for ssh in self.conn.list_all_ssh:
             handler = action.SystemOperation(ssh)
             handler.replace_linbit_sources()
+
+    def recovery_linbit_sources(self):
+        for ssh in self.conn.list_all_ssh:
+            handler = action.SystemOperation(ssh)
+            handler.recovery_linbit_sources()
 
     def bak_sources_files(self):
         for ssh in self.conn.list_all_ssh:

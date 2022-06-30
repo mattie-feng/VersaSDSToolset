@@ -56,7 +56,15 @@ class BuildCommands(object):
         #     controller.install_drbd_spc()
         print(" Install software")
         controller.install_docker(args.test)
-        controller.install(args.test)
+        if args.test:
+            controller.replace_linbit_sources()
+            controller.apt_update()
+        controller.install()
+        if args.test:
+            controller.recovery_linbit_sources()
+            controller.apt_update()
+        print(' Start to synchronised time')
+        controller.sync_time()
         print(" Configure LINSTOR")
         controller.create_linstor_conf_file()
         controller.add_to_linstor_cluster()

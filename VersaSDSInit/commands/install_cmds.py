@@ -1,8 +1,6 @@
-import sys
 import control
 import argparse
 
-global INSTALL_FLAG
 INSTALL_FLAG = False
 
 
@@ -17,6 +15,7 @@ class InstallCommands(object):
             help='Install VersaSDS software'
         )
         parser_install.add_argument(
+            '-t',
             '-test',
             dest='test',
             action='store_true',
@@ -27,6 +26,7 @@ class InstallCommands(object):
 
         p_linbit = subp_install.add_parser('linbit', help='install software of linbit')
         p_linbit.add_argument(
+            '-t',
             '-test',
             dest='test',
             action='store_true',
@@ -36,6 +36,7 @@ class InstallCommands(object):
 
         p_lvm2 = subp_install.add_parser('lvm2', help='install lvm2')
         p_lvm2.add_argument(
+            '-t',
             '-test',
             dest='test',
             action='store_true',
@@ -45,6 +46,7 @@ class InstallCommands(object):
 
         p_pacemaker = subp_install.add_parser('pacemaker', help='install pacemaker')
         p_pacemaker.add_argument(
+            '-t',
             '-test',
             dest='test',
             action='store_true',
@@ -54,6 +56,7 @@ class InstallCommands(object):
 
         p_targetcli = subp_install.add_parser('targetcli', help='install targetcli')
         p_targetcli.add_argument(
+            '-t',
             '-test',
             dest='test',
             action='store_true',
@@ -67,17 +70,22 @@ class InstallCommands(object):
     def install_linbit(cls, args):
         cls.change_sources(args)
         sc = control.VersaSDSSoftConsole()
-
+        # if args.test:
+        #     print('Add linbit-drbd ...')
+        #     result = sc.install_spc()
+        #     if not all(result):
+        #         print("Failed to add linbit-drbd，exit")
+        #         sys.exit(1)
         if args.test:
-            print('Add linbit-drbd ...')
-            result = sc.install_spc()
-            if not all(result):
-                print("Failed to add linbit-drbd，exit")
-                sys.exit(1)
+            sc.replace_linbit_sources()
+            sc.apt_update()
         print('Start install software of DRBD')
         sc.install_drbd()
         print('Start install software of LINSTOR')
         sc.install_linstor()
+        if args.test:
+            sc.recovery_linbit_sources()
+            sc.apt_update()
 
     @classmethod
     def install_lvm2(cls, args):

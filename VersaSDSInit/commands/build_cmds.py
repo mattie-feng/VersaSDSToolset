@@ -15,6 +15,7 @@ class BuildCommands(object):
         parser_build.add_argument('-sp', default='pool0')
         parser_build.set_defaults(func=self.build_all)
         parser_build.add_argument(
+            '-t',
             '-test',
             dest='test',
             action='store_true',

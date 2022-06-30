@@ -392,6 +392,16 @@ class VersaSDSSoftConsole(object):
             handler = action.Host(ssh)
             handler.replace_sources()
 
+    def replace_linbit_sources(self):
+        for ssh in self.conn.list_ssh:
+            handler = action.Host(ssh)
+            handler.replace_linbit_sources()
+
+    def recovery_linbit_sources(self):
+        for ssh in self.conn.list_ssh:
+            handler = action.Host(ssh)
+            handler.recovery_linbit_sources()
+
     def bak_sources_files(self):
         for ssh in self.conn.list_ssh:
             handler = action.Host(ssh)

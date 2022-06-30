@@ -4,7 +4,6 @@ import time
 import utils
 
 
-# TODO
 class SystemOperation(object):
     def __init__(self, conn=None):
         self.conn = conn
@@ -28,6 +27,9 @@ class SystemOperation(object):
     def replace_linbit_sources(self):
         utils.exec_cmd('mv /etc/apt/sources.list /etc/apt/sources.list.x86bak', self.conn)
         utils.exec_cmd('echo "deb [trusted=yes] http://10.203.1.9:80/x86vm ./" > /etc/apt/sources.list', self.conn)
+
+    def recovery_linbit_sources(self):
+        utils.exec_cmd('mv /etc/apt/sources.list.x86bak /etc/apt/sources.list', self.conn)
 
     def get_sources_list(self):
         cmd = f'find /etc/apt/sources.list.d -name "*.list"'
@@ -68,7 +70,6 @@ class Keepalived(object):
         utils.exec_cmd("systemctl restart keepalived", self.conn)
         utils.exec_cmd("systemctl enable keepalived", self.conn)
 
-    # TODO check apiserver_
     def set_check_apiserver_sh(self):
         editor = utils.FileEdit("./check_apiserver.sh")
         utils.exec_cmd(f"echo '{editor.data}' > /etc/keepalived/check_apiserver.sh", self.conn)
@@ -112,6 +113,7 @@ class VersaKBS(object):
         else:
             utils.exec_cmd("apt install -y docker-ce", self.conn)
         utils.exec_cmd("apt install -y socat conntrack", self.conn)
+        utils.exec_cmd("apt install -y ntpdate", self.conn)
 
     def install_kk(self):
         utils.exec_cmd("export KKZONE=cn && curl -sfL https://get-kk.kubesphere.io | sh -", self.conn)
@@ -139,7 +141,6 @@ class VersaKBS(object):
         utils.exec_cmd(f"echo '{editor.data}' > config-sample.yaml", self.conn)
 
     def build(self):
-        # TODO
         # utils.exec_cmd_realtime("./kk create cluster -f config-sample.yaml -y")
         utils.exec_cmd("./kk create cluster -f config-sample.yaml -y", self.conn)
 
@@ -147,6 +148,10 @@ class VersaKBS(object):
 class VersaSDS(object):
     def __init__(self, conn=None):
         self.conn = conn
+
+    def sync_time(self):
+        cmd = 'ntpdate -u ntp.api.bz'
+        utils.exec_cmd(cmd, self.conn)
 
     # TODO
     def install_drbd_spc(self, times=8):
@@ -200,12 +205,10 @@ class VersaSDS(object):
         cmd = f"systemctl {status} linstor-satellite"
         utils.exec_cmd(cmd, self.conn)
 
-    # TODO
     def create_node(self, node, ip, type='Satellite'):
         cmd = f'linstor node create {node} {ip} --node-type {type}'
         utils.exec_cmd(cmd, self.conn)
 
-    # TODO
     def check_status(self, name):
         cmd = f'systemctl is-enabled {name}'
         result = utils.exec_cmd(cmd, self.conn)
