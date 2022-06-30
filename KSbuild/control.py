@@ -85,7 +85,10 @@ class KSConsole(object):
             lst.append(gevent.spawn(handler.install_docker, flag))
         gevent.joinall(lst)
 
-    def install(self):
+    def install(self, flag):
+        if flag:
+            self.replace_linbit_sources()
+            self.apt_update()
         for ssh in self.conn.list_all_ssh:
             handler = action.VersaKBS(ssh)
             handler.install()
@@ -181,6 +184,13 @@ class KSConsole(object):
             lst.append(gevent.spawn(handler.restart))
         gevent.joinall(lst)
 
+    def check_apiserver(self):
+        lst = []
+        for ssh in self.conn.list_master_ssh:
+            handler = action.Keepalived(ssh)
+            lst.append(gevent.spawn(handler.set_check_apiserver_sh))
+        gevent.joinall(lst)
+
     def restart_keepalived(self):
         lst = []
         for ssh in self.conn.list_master_ssh:
@@ -201,7 +211,7 @@ class KSConsole(object):
         for ssh in self.conn.list_all_ssh:
             handler = action.VersaSDS(ssh)
             handler.create_conf(vip)
-            handler.start_satellite('restart')
+            handler.start_satellite()
 
     def add_to_linstor_cluster(self):
         handler = action.VersaSDS(self.conn.linstor_ssh)
@@ -211,10 +221,10 @@ class KSConsole(object):
     def set_linstor_server(self):
         vip = self.conn.data["VersaSDS"]["vip"]
         handler = action.VersaSDS(self.default_ssh)
+        handler.connect_linstor_cluster(vip)
+        time.sleep(5)
         handler.set_console_image(self.conn.data["ImageVersion"]["console"])
         handler.set_server_image(self.conn.data["ImageVersion"]["server"])
-        time.sleep(5)
-        handler.connect_linstor_cluster(vip)
         time.sleep(5)
         handler.set_linstor_csi(vip)
 
@@ -242,5 +252,3 @@ class KSConsole(object):
         for ssh in self.conn.list_all_ssh:
             handler = action.SystemOperation(ssh)
             handler.apt_update()
-
-# KSConsole().modify_kk()

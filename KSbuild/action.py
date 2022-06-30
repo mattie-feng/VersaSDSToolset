@@ -1,3 +1,4 @@
+import sys
 import time
 
 import utils
@@ -106,7 +107,6 @@ class VersaKBS(object):
         utils.exec_cmd(cmd, self.conn)
 
     def install_docker(self, flag):
-        # TODO
         if flag:
             utils.exec_cmd("curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun", self.conn)
         else:
@@ -114,7 +114,7 @@ class VersaKBS(object):
         utils.exec_cmd("apt install -y socat conntrack", self.conn)
 
     def install_kk(self):
-        utils.exec_cmd("export KKZONE=cn && curl -sfL https://get-kk.kubesphere.io | VERSION=v1.1.0 sh -", self.conn)
+        utils.exec_cmd("export KKZONE=cn && curl -sfL https://get-kk.kubesphere.io | sh -", self.conn)
         utils.exec_cmd("chmod +x kk", self.conn)
 
     def create_config(self):
@@ -187,9 +187,14 @@ class VersaSDS(object):
         utils.exec_cmd('systemctl enable linstor-satellite', self.conn)
 
     def create_conf(self, ips):
+
         conf_data = f"[global]\ncontrollers={ips}"  # ips逗号分割
         cmd = f'echo "{conf_data}" > /etc/linstor/linstor-client.conf'
-        utils.exec_cmd(cmd, self.conn)
+        result = utils.exec_cmd(cmd, self.conn)
+        if result:
+            if 'No such file or directory' in result:
+                utils.exec_cmd('mkdir -p /etc/linstor', self.conn)
+                utils.exec_cmd(cmd, self.conn)
 
     def start_satellite(self, status='start'):
         cmd = f"systemctl {status} linstor-satellite"
@@ -228,6 +233,8 @@ class VersaSDS(object):
     def connect_linstor_cluster(self, vip):
         utils.exec_cmd('kubectl get deployment.apps/ks-apiserver -n kubesphere-system -o yaml > ksapi.yaml', self.conn)
         string_ksapi = utils.exec_cmd('cat ksapi.yaml', self.conn)
+        if not string_ksapi:
+            sys.exit()
         utils.exec_cmd(f"echo '{string_ksapi}' > ksapi.yaml")
         editor = utils.FileEdit("./ksapi.yaml")
         editor.insert_data(f"        - '--linstor={vip}:3370'", anchor="        - --logtostderr=true", type="under")

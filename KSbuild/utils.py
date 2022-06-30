@@ -1,3 +1,5 @@
+import sys
+
 import paramiko
 import yaml
 import socket
@@ -31,13 +33,15 @@ class SSHConn(object):
             # objSSHClient.exec_command("\x003")
             self.SSHConnection = objSSHClient
         except:
-            pass
+            print(f'Failed to connect host {self._host}')
 
     def ssh_connect(self):
         self._connect()
         if not self.SSHConnection:
-            print('Connect retry for SAN switch "%s" ...' % self._host)
+            print(f'Connect retry for host {self._host}')
             self._connect()
+            if not self.SSHConnection:
+                sys.exit()
 
     def exec_cmd(self, command):
         if self.SSHConnection:
@@ -312,7 +316,7 @@ class Log():
 
     @staticmethod
     def set_handler(logger):
-        fh = logging.FileHandler('./KSbuild.log', mode='a')
+        fh = logging.FileHandler('KSbuild.log', mode='a')
         fh.setLevel(logging.DEBUG)  # 输出到file的log等级的开关
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         fh.setFormatter(formatter)

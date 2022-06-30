@@ -1,5 +1,6 @@
 import argparse
 import sys
+import re
 
 sys.path.append('../')
 import consts
