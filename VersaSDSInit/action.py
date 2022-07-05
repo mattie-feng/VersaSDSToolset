@@ -60,6 +60,13 @@ class Host(object):
         cmd = 'apt -y update'
         utils.exec_cmd(cmd, self.conn)
 
+    def replace_linbit_sources(self):
+        utils.exec_cmd('mv /etc/apt/sources.list /etc/apt/sources.list.x86bak', self.conn)
+        utils.exec_cmd('echo "deb [trusted=yes] http://10.203.1.9:80/x86vm ./" > /etc/apt/sources.list', self.conn)
+
+    def recovery_linbit_sources(self):
+        utils.exec_cmd('mv /etc/apt/sources.list.x86bak /etc/apt/sources.list', self.conn)
+
     def replace_sources(self):
         utils.exec_cmd('mv /etc/apt/sources.list /etc/apt/sources.list.1bak', self.conn)
         utils.exec_cmd('echo "deb [trusted=yes] http://10.203.1.9:80/versaplx ./" > /etc/apt/sources.list', self.conn)
@@ -225,7 +232,6 @@ class Pacemaker(object):
         utils.exec_cmd("crm conf del g_linstor ms_drbd_linstordb p_drbd_linstordb", self.conn)
         utils.exec_cmd("crm conf del drbd-attr", self.conn)
         utils.exec_cmd("crm conf del vipcontroller", self.conn)
-
 
     def clear_crm_node(self, node):
         utils.exec_cmd(f"crm conf del {node}", self.conn)
@@ -575,8 +581,11 @@ order o_drbd_before_linstor inf: ms_drbd_linstordb:promote g_linstor:start"""
         cmd = f'drbdadm secondary {drbd}'
         utils.exec_cmd(cmd, self.conn)
 
-    # 配置linstor-satellite systemd，解决机器重启后 linstor not install 的报错问题
     def modify_satellite_service(self):
+        """
+        配置 linstor-satellite systemd 让它开启的时候不要删掉 linstordb 的配置文件，解决机器重启后 linstor not install 的报错问题
+        @return:
+        """
         satellite_conf = "/etc/systemd/system/multi-user.target.wants/linstor-satellite.service"
         conf_data = utils.exec_cmd(f"cat {satellite_conf}", self.conn)
         if not "Environment=LS_KEEP_RES=linstordb" in conf_data:
@@ -611,6 +620,7 @@ class DRBD(object):
         cmd1 = 'apt install -y software-properties-common'
         cmd2 = 'add-apt-repository -y ppa:linbit/linbit-drbd9-stack'
         utils.exec_cmd(cmd1, self.conn)
+        time.sleep(2)
         utils.exec_cmd(cmd2, self.conn)
         while not self.is_exist_linbit_ppa():
             if self.conn:
@@ -642,7 +652,7 @@ class DRBD(object):
             return version_kernel[0]
 
     def uninstall(self):
-        cmd = 'apt purge -y software-properties-common && apt purge -y drbd-utils  drbd-dkms'
+        cmd = 'apt purge -y software-properties-common && apt purge -y drbd-utils drbd-dkms'
         utils.exec_cmd(cmd, self.conn)
 
 
@@ -672,8 +682,8 @@ class Linstor(object):
         cmd = f"systemctl {status} linstor-satellite"
         utils.exec_cmd(cmd, self.conn)
 
-    def create_node(self, node, ip):
-        cmd = f'linstor node create {node} {ip}  --node-type Combined'
+    def create_node(self, node, ip, type='Combined'):
+        cmd = f'linstor node create {node} {ip}  --node-type {type}'
         utils.exec_cmd(cmd, self.conn)
 
     def create_lvm_sp(self, node, vg, sp):
