@@ -6,6 +6,9 @@ import paramiko
 import yaml
 import socket
 import argparse
+import os
+import re
+import stat
 
 
 def exec_cmd(cmd, conn=None):
@@ -82,10 +85,113 @@ def mkdir(path, ssh_obj=None):
     if not bool(exec_cmd(f'[ -d {path} ] && echo True', ssh_obj)):
         exec_cmd(f"mkdir -p {path}", ssh_obj)
 
+def extrace_file_name(path):
+    """
+    处理输入的路径，提取最后的文件夹名或是文件名
+    """
+    result = re.findall(r'[^\\/:*?"<>|\r\n]+$',path)
+    result1 = result[0]
+    return result1
+
+def get_all_files_in_remote_dir(sftp,remote_dir):
+    """
+    递归获取远程当前目录下所有文件目录
+    """
+    all_files = []
+    if remote_dir[-1] == '/':   #排除/root/test/的情况，修正为/root/test
+        remote_dir = remote_dir[0:-1]
+
+    files = sftp.listdir_attr(remote_dir)   #列出指定目录下的所有文件和目录以及属性
+    if not files:
+        all_files.append(remote_dir)
+    else:
+        for file in files:
+            filename = remote_dir + '/' + file.filename
+
+            if stat.S_ISDIR(file.st_mode):  #通过stat模块来实现检查类型
+                all_files.extend(get_all_files_in_remote_dir(sftp,filename))
+            else:
+                all_files.append(filename)
+
+    return all_files
+
 
 def scp_file(file_source, file_target, ssh_obj=None):
-    cmd = f"scp -r {file_source} {file_target}" #scp传输格式：scp [可选参数] file_source file_target
-    exec_cmd(cmd, ssh_obj)
+    # cmd = f"scp -r {file_source} {file_target}" #scp传输格式：scp [可选参数] file_source file_target
+    # exec_cmd(cmd, ssh_obj)
+    test1 = os.path.split(file_target)[1]
+
+    if test1 == '':
+        pass
+    else:
+        file_target = file_target + '/'
+
+    file_name = extrace_file_name(file_source)
+    path = file_target
+    print(f"Start downloading: {file_source}")
+
+    one_test = ssh_obj
+    one_test_sftp = one_test.sftp
+
+    teststr = one_test_sftp.stat(file_source)
+    print("The file/folder is detected and can be downloaded")
+
+    testfile2 = one_test_sftp.listdir_attr(file_source)
+    if testfile2 is not None:
+        source = file_source
+        target = file_target  # 测试，正式加入时改回linux方法 C:\\EFI\\
+
+        obj_ssh = ssh_obj
+        test_sftp = obj_ssh.sftp
+        all_files = get_all_files_in_remote_dir(test_sftp, source)
+
+        local_pathname = os.path.split(source)[-1]  # 远程下载的文件名 test
+        real_local_Path = path + local_pathname  # 远程下载后保存的路径，包括目录名 C:/EFI/test
+
+        if not target[-1] == '/':  # 排除/root/test/的情况，修正为/root/test
+            target = target + '/'
+            print(f"Download path error，change to {target}")
+        else:
+            print("Download path is correct")
+
+        if not os.path.isdir(target):
+            print("Download path entered does not exist, please re output")
+        else:
+            print("Download path is correct, and the download will begin soon")
+
+        if not os.path.isdir(real_local_Path):  # 如果下载的根文件不存在，则创建，创建test
+            mkdir_file2 = f'mkdir {real_local_Path}'
+            subprocess.run(mkdir_file2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           encoding='UTF-8',
+                           timeout=100)
+
+        for filepath in all_files:
+            # filepath = filepath.replace("/", "\\")  #测试，正式加入时删除
+            off_path_name = filepath.split(local_pathname)[-1]  # 用本地根文件夹名分隔本地文件路径，取得相对于下载的根文件的文件路径
+
+            try:
+                testfiles = test_sftp.listdir_attr(filepath)
+                if testfiles == [] and os.path.split(off_path_name)[0] == '/':
+                    abs_path = off_path_name
+            except:
+                abs_path = os.path.split(off_path_name)[0]
+
+            reward_local_path = real_local_Path + abs_path
+            if not reward_local_path == '/':
+                subprocess.run(f'mkdir -p {reward_local_path}', shell=True, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, encoding='UTF-8',
+                               timeout=100)
+
+            try:
+                testfile2 = test_sftp.listdir_attr(filepath)
+                if testfile2 == [] and os.path.split(off_path_name)[0] == '/':
+                    pass
+            except:
+                abs_file = os.path.split(filepath)[1]  # 期望下载的文件名
+                to_local = reward_local_path + '/' + abs_file  # 下载文件到远端的路径，\\删除
+                obj_ssh.sftp_get(filepath, to_local)
+
+    print(f"Download complete: {file_source}")
 
 
 class SSHConn(object):
@@ -97,7 +203,9 @@ class SSHConn(object):
         self._username = username
         self._password = password
         self.SSHConnection = None
+        self.transport = paramiko.Transport((self._host, self._port))
         self.ssh_connect()
+        self.sftp = paramiko.SFTPClient.from_transport(self.transport)
 
     def _connect(self):
         try:
@@ -110,9 +218,20 @@ class SSHConn(object):
                                  timeout=self._timeout)  # 连接服务器
             # time.sleep(1)
             # objSSHClient.exec_command("\x003")
+            self.transport.connect(username=self._username, password=self._password)
             self.SSHConnection = objSSHClient
         except:
             pass
+
+    def sftp_get(self, remotefile, localfile):
+        try:
+            self.sftp.get(remotefile, localfile)
+        except:
+            print("SFTP connection failed")
+
+    def close(self):
+        self.sftp.close()
+        self.SSHConnection.close()
 
     def ssh_connect(self):
         self._connect()
@@ -136,6 +255,7 @@ class SSHConn(object):
 
 
 class ConfFile():
+
     def __init__(self):
         self.yaml_file = './config.yaml'
         self.cluster = self.read_yaml()
@@ -219,7 +339,7 @@ class Console:
         local_ip = self.conn.get_host_ip()
         # for node in self.conn.cluster['node']:
         #     if local_ip == node['public_ip']:
-        return f"root@{local_ip}:{self.logfilepath}/"
+        return f"{self.logfilepath}/"
 
     def save_linbit_file(self):
         for ssh, node in zip(self.conn.list_ssh, self.conn.cluster['node']):
