@@ -134,7 +134,6 @@ def scp_file(file_source, file_target, ssh_obj=None):
     one_test_sftp = one_test.sftp
 
     teststr = one_test_sftp.stat(file_source)
-    print("The file/folder is detected and can be downloaded")
 
     testfile2 = one_test_sftp.listdir_attr(file_source)
     if testfile2 is not None:
@@ -152,12 +151,12 @@ def scp_file(file_source, file_target, ssh_obj=None):
             target = target + '/'
             print(f"Download path error，change to {target}")
         else:
-            print("Download path is correct")
+            pass
 
         if not os.path.isdir(target):
             print("Download path entered does not exist, please re output")
         else:
-            print("Download path is correct, and the download will begin soon")
+            pass
 
         if not os.path.isdir(real_local_Path):  # 如果下载的根文件不存在，则创建，创建test
             mkdir_file2 = f'mkdir {real_local_Path}'
@@ -382,28 +381,28 @@ def collect_(args):
     # print("处理CRM的log")
     # worker.save_crm_file()
     # print("处理结束")
-    print("请输入python3 debug.py -h以获取帮助信息")
+    print("Please enter python3 debug.py -h for help")
 
 
 def collect(args):
     if not args.soft:
-        print("处理LINBIT的log")
+        print("Processing LINBIT's log")
         worker.save_linbit_file()
-        print("处理DRBD的log")
+        print("Processing DRBD's log")
         worker.save_drbd_file()
-        print("处理CRM的log")
+        print("Processing CRM's log")
         worker.save_crm_file()
-        print("处理结束")
+        print("End of processing")
     else:
         for soft in args.soft:
             if soft == 'LINBIT':
-                print("处理LINBIT的log")
+                print("Processing LINBIT's log")
                 worker.save_linbit_file()
             elif soft == 'DRBD':
-                print("处理DRBD的log")
+                print("Processing DRBD's log")
                 worker.save_drbd_file()
             elif soft == 'CRM':
-                print("处理CRM的log")
+                print("Processing CRM's log")
                 worker.save_crm_file()
 
 
@@ -413,7 +412,7 @@ def show(args):
     elif args.node is None and args.soft is None:
         print(show_tree_all(path))
     else:
-        print("请指定节点")
+        print("Please specify a node")
 
     if args.path:
         print(show_tree_all(args.path))
