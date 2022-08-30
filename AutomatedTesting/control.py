@@ -1,4 +1,3 @@
-import sys
 import utils
 import action
 import gevent
@@ -88,7 +87,16 @@ def kill_dd(conn, device):
         dd_node.kill_dd(pid)
         utils.prt_log(conn, f"Kill dd on {utils.get_global_dict_value(conn)}.", 0)
     else:
-        utils.prt_log(conn, f"dd operation had been finished.", 0)
+        utils.prt_log(conn, f"dd operation had been finished on {utils.get_global_dict_value(conn)}.", 0)
+
+
+def check_dd(conn, device):
+    dd_node = action.RWData(conn)
+    result = dd_node.get_dd()
+    pid = get_dd_pid(conn, device, result)
+    if pid:
+        utils.prt_log(conn, f"dd operation (pid: {pid}) is still in progress on {utils.get_global_dict_value(conn)}", 0)
+        return True
 
 
 class Connect(object):
@@ -180,7 +188,7 @@ class QuorumAutoTest(object):
         # self.install_software()
         # TODO 可优化，使用 LINSTOR API 代码
         install_obj = action.InstallSoftware(vtel_conn)
-        install_obj.update_pip()
+        # install_obj.update_pip()
         install_obj.install_vplx()
 
         self.create_linstor_resource(vtel_conn, sp, resource)
@@ -251,6 +259,7 @@ class QuorumAutoTest(object):
                     kill_dd(conn_list[0], device_name)
                     if thread1.is_alive():
                         stop_thread(thread1)
+                    check_dd(conn_list[0], device_name)
                 else:
                     utils.prt_log(conn_list[0], f"Configuration 'quorum:no' not exist ...", 0)
                     self.get_log()
@@ -262,6 +271,7 @@ class QuorumAutoTest(object):
                 thread1.join()
                 time.sleep(10)
                 kill_dd(conn_list[1], device_name)
+                check_dd(conn_list[1], device_name)
                 time.sleep(5)
                 if thread3.is_alive():
                     stop_thread(thread3)
@@ -269,7 +279,6 @@ class QuorumAutoTest(object):
                 thread3.join()
                 ip_a.up_device(device)
                 utils.prt_log(conn_list[0], f"Up {device} on {node_a}  ...", 0)
-                ip_a.netplan_apply()
                 time.sleep(5)
                 if not self.cycle_check_drbd_status(resource):
                     self.get_log()
@@ -421,14 +430,12 @@ class IscsiTest(object):
             time.sleep(40)
             if not self.check_target_lun_status(target, resource, self.conn.list_vplx_ssh[1]):
                 ip_obj.up_device(device)
-                ip_obj.netplan_apply()
                 time.sleep(30)
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])
                 self.email.send_autotest_mail()
                 utils.prt_log('', f"Finished to collect crm_report and exit testing ...", 2)
             utils.prt_log(self.conn.list_vplx_ssh[0], f"Up {device} on {ip_node} ...", 0)
             ip_obj.up_device(device)
-            ip_obj.netplan_apply()
             time.sleep(30)
             if not self.check_drbd_status(resource):
                 self.collect_crm_report_file(start_time, self.conn.list_vplx_ssh[0])

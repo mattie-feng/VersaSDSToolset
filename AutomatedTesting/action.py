@@ -28,22 +28,24 @@ class IpService(object):
         self.conn = conn
 
     def down_device(self, device):
-        cmd = f"ifconfig {device} down"
+        # cmd = f"ifconfig {device} down"
+        cmd = f"nmcli device disconnect {device}"
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
             return True
 
     def up_device(self, device):
-        cmd = f"ifconfig {device} up"
+        # cmd = f"ifconfig {device} up"
+        cmd = f"nmcli device connect {device}"
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
             return True
 
-    def netplan_apply(self):
-        cmd = "netplan apply"
-        result = utils.exec_cmd(cmd, self.conn)
-        if result["st"]:
-            return True
+    # def netplan_apply(self):
+    #     cmd = "netplan apply"
+    #     result = utils.exec_cmd(cmd, self.conn)
+    #     if result["st"]:
+    #         return True
 
 
 class DebugLog(object):

@@ -23,7 +23,7 @@ class AutomatedTesting(object):
                                  action='store_true')
 
         parser_apply = subp.add_parser("apply", help="Apply config file of Auto Test")
-        parser_apply.add_argument('file', metavar='FILE', action='store', help='YAML file with IP config')
+        parser_apply.add_argument('file', metavar='FILE', action='store', help='YAML file with test config')
 
         parser_apply.set_defaults(func=self.apply_file)
 
