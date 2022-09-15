@@ -28,8 +28,8 @@ class IpService(object):
         self.conn = conn
 
     def down_device(self, device):
-        # cmd = f"ifconfig {device} down"
-        cmd = f"nmcli device disconnect {device}"
+        cmd = f"ifconfig {device} down"
+        # cmd = f"nmcli device disconnect {device}"
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
             return True
