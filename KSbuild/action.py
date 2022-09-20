@@ -121,7 +121,7 @@ class VersaKBS(object):
 
     def create_config(self):
         utils.exec_cmd("rm -rf config-sample.yaml", self.conn)
-        utils.exec_cmd("./kk create config --with-kubesphere v3.1.0 --with-kubernetes v1.20.4", self.conn)
+        utils.exec_cmd("./kk create config --with-kubesphere v3.3.0 --with-kubernetes v1.22.10", self.conn)
 
     def modify_config(self, host, etcd, master, worker, vip, port, flag=False):
         editor = utils.FileEdit("./sample-kk.yaml")
