@@ -1,6 +1,5 @@
 import os
 import subprocess
-# import paramiko
 import utils
 from utils import SSHConn
 import time
@@ -112,12 +111,12 @@ class SSHAuthorize:
         config_is_exist = bool(ssh.exec_cmd('[ -f /root/.ssh/config ] && echo True'))
         if not config_is_exist:
             ssh.exec_cmd("echo -e 'StrictHostKeyChecking no\\nUserKnownHostsFile /dev/null' >> ~/.ssh/config ")
-        public_key = ssh.exec_cmd('cat /root/.ssh/id_rsa.pub').decode()
+        public_key = ssh.exec_cmd('cat /root/.ssh/id_rsa.pub')
         return public_key
 
     @staticmethod
     def get_hostname(ssh):
-        hostname = ssh.exec_cmd('hostname').decode().strip()
+        hostname = ssh.exec_cmd('hostname').strip()
         return hostname
 
     @staticmethod
@@ -439,7 +438,7 @@ class SSHAuthorizeNoMGN(SSHAuthorize):
         if not config_is_exist:
             utils.exec_cmd("echo 'StrictHostKeyChecking no\nUserKnownHostsFile /dev/null' >> ~/.ssh/config ", conn)
         public_key = utils.exec_cmd('cat /root/.ssh/id_rsa.pub', conn)
-        public_key = public_key.decode() if isinstance(public_key, bytes) else public_key
+        public_key = public_key if isinstance(public_key, bytes) else public_key
         return public_key.strip()
 
     def convert_all_keys_by_cluster_to_string(self, cluster_name):
@@ -493,8 +492,7 @@ class SSHAuthorizeNoMGN(SSHAuthorize):
 
 
 if __name__ == '__main__':
-    node_infos = [['10.203.1.155', 22, 'root', 'password'], ['10.203.1.157', 22, 'root', 'password'],
-                  ['10.203.1.195', 22, 'root', 'password']]
+    node_infos = [['47.99.219.219', 22, 'root', 'guitqil123A']]
     # ssh = paramiko.SSHClient()
     # ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     # ssh.connect('10.203.1.86',22)
