@@ -2,6 +2,24 @@ import paramiko
 import sys
 import subprocess
 import logging
+import argparse
+import consts
+
+
+def setup_parser():
+    parser = argparse.ArgumentParser(prog='main')
+    parser.add_argument('-v',
+                             '--version',
+                             dest='version',
+                             help='Show current version',
+                             action='store_true')
+    parser.set_defaults(func=main_usage)
+
+def main_usage(self, args):
+    if args.version:
+        print(f'Version: {consts.VERSION}')
+    else:
+        self.print_help(self.parser)
 
 def exec_cmd(cmd, conn=None):
     if conn:
