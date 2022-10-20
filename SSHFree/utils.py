@@ -1,32 +1,15 @@
 import paramiko
-import sys
 import subprocess
 import logging
-import argparse
-import consts
-
-
-def setup_parser():
-    parser = argparse.ArgumentParser(prog='main')
-    parser.add_argument('-v',
-                             '--version',
-                             dest='version',
-                             help='Show current version',
-                             action='store_true')
-    parser.set_defaults(func=main_usage)
-
-def main_usage(self, args):
-    if args.version:
-        print(f'Version: {consts.VERSION}')
-    else:
-        self.print_help(self.parser)
+import sys
+import time
+import re
 
 def exec_cmd(cmd, conn=None):
     if conn:
         result = conn.exec_cmd(cmd)
     else:
         result = subprocess.getoutput(cmd)
-    result = result.decode() if isinstance(result, bytes) else result
     log_data = f'{conn._host if conn else "localhost"} - {cmd} - {result}'
     Log().logger.info(log_data)
     if result:
@@ -74,7 +57,29 @@ class SSHConn(object):
             err = stderr.read()
             if len(err) > 0:
                 err = err.decode() if isinstance(err, bytes) else err
-                return err
+                return False
+
+    def exec_copy_id_rsa_pub(self,target_ip,passwd):
+        cmd = f'ssh-copy-id -i /root/.ssh/id_rsa.pub root@{target_ip}'
+        conn = self.SSHConnection.invoke_shell()
+        conn.keep_this = self.SSHConnection
+        time.sleep(2)
+        conn.send(cmd + '\n')
+        time.sleep(2)
+        conn.send(passwd + '\n')
+        log_data = f'{self._host} - {cmd}'
+        Log().logger.info(log_data)
+
+        while True:
+            time.sleep(1)
+            stdout = conn.recv(1024)
+            stdout = conn.recv(1024)
+            stdout = conn.recv(1024)
+            break
+
+    def ssh_close(self):
+        self.SSHConnection.close()
+
 
 class Log(object):
     def __init__(self):
