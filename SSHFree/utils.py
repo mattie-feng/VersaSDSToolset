@@ -60,22 +60,22 @@ class SSHConn(object):
                 return False
 
     def exec_copy_id_rsa_pub(self,target_ip,passwd):
-        cmd = f'ssh-copy-id -i /root/.ssh/id_rsa.pub root@{target_ip}'
+        cmd = f'ssh-copy-id -o stricthostkeychecking=no -i /root/.ssh/id_rsa.pub root@{target_ip}'
         conn = self.SSHConnection.invoke_shell()
         conn.keep_this = self.SSHConnection
+        print(cmd)
         time.sleep(2)
         conn.send(cmd + '\n')
         time.sleep(2)
-        conn.send(passwd + '\n')
-        log_data = f'{self._host} - {cmd}'
-        Log().logger.info(log_data)
+        stdout = conn.recv(1024)
+        info = stdout.decode()
+        result = re.findall(r'Number of key(s) added: 1',info)
+        if result == []:
+            time.sleep(2)
+            conn.send(passwd + '\n')
 
-        while True:
-            time.sleep(1)
-            stdout = conn.recv(1024)
-            stdout = conn.recv(1024)
-            stdout = conn.recv(1024)
-            break
+        time.sleep(1)
+        stdout = conn.recv(9999)
 
     def ssh_close(self):
         self.SSHConnection.close()

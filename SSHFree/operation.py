@@ -1,6 +1,7 @@
 import paramiko
 import subprocess
 import yaml
+import utils
 
 def read_config(yaml_name):
     try:
@@ -14,20 +15,23 @@ def read_config(yaml_name):
 
 def check_id_rsa_pub(ssh_obj):
     cmd = '[ -f /root/.ssh/id_rsa.pub ] && echo True || echo False'
-    result = ssh_obj.exec_cmd(cmd)
+    result = utils.exec_cmd(cmd,ssh_obj)
     result = result.replace(" ","")
     result = result.replace("\n","")
     if result == 'False':
-        return True
-    else:
         return False
+    else:
+        return True
 
 def create_id_rsa_pub(ssh_obj):
     cmd = 'ssh-keygen -f /root/.ssh/id_rsa -N ""'
-    result = ssh_obj.exec_cmd(cmd)
+    result = utils.exec_cmd(cmd,ssh_obj)
     if not result:
         return False
     else:
         return True
 
-
+def revise_sshd_config(ssh_obj):
+    cmd = "sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/g' /etc/ssh/sshd_config"
+    utils.exec_cmd(cmd,ssh_obj)
+    return True

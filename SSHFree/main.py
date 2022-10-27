@@ -41,6 +41,7 @@ def main():
         usname = z['username']
         passwd = z['password']
         ssh_obj = utils.SSHConn(host=ipaddr,username=usname,password=passwd)
+        status0 = operation.revise_sshd_config(ssh_obj)
         status1 = operation.check_id_rsa_pub(ssh_obj)
         if status1 is False:
             print(f'{ipaddr}不存在公钥，开始创建公钥')
