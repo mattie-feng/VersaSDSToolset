@@ -20,19 +20,32 @@ class argparse_operator:
 
         self.parser.set_defaults(func=self.main_usage)
 
+        parser_free = sub_parser.add_parser("free",aliases=['fe'],help='free_login')
+
+        parser_re_free = sub_parser.add_parser("re",aliases=['re'],help='re_free_login')
+
+        parser_free.set_defaults(func=self.func_free_login)
+        parser_re_free.set_defaults(func=self.func_re_free_login)
+
     def main_usage(self,args):
         if args.version:
             print(f'Version: ？')
             sys.exit()
         else:
-            main()
+            self.parser.print_help()
 
     def parser_init(self):
         args = self.parser.parse_args()
         args.func(args)
 
+    def func_free_login(self,args):
+        free_login()
 
-def main():
+    def func_re_free_login(self,args):
+        re_free_login()
+
+
+def free_login():
     config_info = operation.read_config('config.yaml')
     node_list = config_info['node']
     for z in node_list:
@@ -72,6 +85,24 @@ def main():
         except:
             print('公钥散发失败，程序自动退出')
             sys.exit()
+
+def re_free_login():
+    config_info = operation.read_config('config.yaml')
+    node_list = config_info['node']
+    for z in node_list:
+        name = z['name']
+        ipaddr = z['ip']
+        usname = z['username']
+        passwd = z['password']
+        print(f'现在开始进行{ipaddr}的去免密操作')
+        ssh_obj = utils.SSHConn(host=ipaddr,username=usname,password=passwd)
+        status0 = operation.check_authorized_keys(ssh_obj)
+        try:
+            delete_cmd = "rm /root/.ssh/authorized_keys"
+            utils.exec_cmd(delete_cmd, ssh_obj)
+            print("去免密成功")
+        except:
+            print("去免密失败")
 
 
 if __name__ == "__main__":

@@ -35,3 +35,13 @@ def revise_sshd_config(ssh_obj):
     cmd = "sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/g' /etc/ssh/sshd_config"
     utils.exec_cmd(cmd,ssh_obj)
     return True
+
+def check_authorized_keys(ssh_obj):
+    cmd = '[ -f /root/.ssh/authorized_keys ] && echo True || echo False'
+    result = utils.exec_cmd(cmd,ssh_obj)
+    result = result.replace(" ","")
+    result = result.replace("\n","")
+    if result == 'False':
+        return False
+    else:
+        return True
