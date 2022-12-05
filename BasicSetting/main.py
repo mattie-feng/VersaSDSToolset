@@ -4,6 +4,7 @@ import sys
 import os
 import control
 import utils
+import action
 
 sys.path.append('../')
 import consts
@@ -27,6 +28,8 @@ class InputParser(object):
                                  action='store_true')
 
         self.parser_build = subp.add_parser("build", aliases=['b'], help="Install software and set basic configuration")
+        self.parser_install = subp.add_parser("install", aliases=['i'], help="Install software")
+        isubp = self.parser_install.add_subparsers()
 
         self.parser_build.add_argument('-ip',
                                        '--ip',
@@ -113,10 +116,16 @@ class InputParser(object):
                                           help='Password of current user',
                                           action='store')
 
+        self.parser_nm = subp.add_parser('intsall nm',
+                                          help='Install network-manager and set network-manager')
+        self.parser_nm = isubp.add_parser('nm',
+                                          help='Install network-manager and set network-manager ')
+
         self.parser_build.set_defaults(func=self.run_func)
         # self.parser_ip.set_defaults(func=self.ip_func)
         self.parser_root.set_defaults(func=self.root_func)
         self.parser_hostname.set_defaults(func=self.hostname_func)
+        self.parser_nm.set_defaults(func=self.install_nm_func)
         self.parser.set_defaults(func=self.help_usage)
 
     def collect_ip_args(self, args):
@@ -174,6 +183,11 @@ class InputParser(object):
     def hostname_func(self, args):
         self.collect_args(args, "hostname")
         control.set_hostname(self.conf_args)
+
+    def install_nm_func(self, args):
+        print("start install network-manager")
+        if action.InstallSoftware().install_software("network-manager"):
+            control.set_nmcli_config()
 
     def check_ip_gateway_format(self, args):
         if args.ip:
