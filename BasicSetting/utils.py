@@ -3,6 +3,7 @@ import subprocess
 import os
 import re
 import sys
+import logging
 
 
 def init_global():
@@ -27,9 +28,16 @@ def exec_cmd(cmd):
     if p.returncode == 0:
         result = p.stdout
         result = result.decode() if isinstance(result, bytes) else result
+        result = result.decode() if isinstance(result, bytes) else result
+        log_data = f'localhost - {cmd} - {result}'
+        Log().logger.info(log_data)
         # print("result", result)
         return {"st": True, "rt": result.rstrip('\n')}
     else:
+        result = p.stdout
+        result = result.decode() if isinstance(result, bytes) else result
+        log_data = f'localhost - {cmd} - {result}'
+        Log().logger.info(log_data)
         print(f"  Failed to execute command: {cmd}")
         print("  Error message:\n", p.stderr)
         return {"st": False, "rt": p.stderr}
@@ -94,3 +102,23 @@ def check_hostname(name):
     else:
         print(
             "\nAt least two letters, beginning with a letter and ending with a letter or number, which can contain letters, numbers and horizontal lines\n")
+
+class Log(object):
+    def __init__(self):
+        pass
+
+    def __new__(cls, *args, **kwargs):
+        if not hasattr(cls, '_instance'):
+            Log._instance = super().__new__(cls)
+            Log._instance.logger = logging.getLogger()
+            Log._instance.logger.setLevel(logging.INFO)
+            Log.set_handler(Log._instance.logger)
+        return Log._instance
+
+    @staticmethod
+    def set_handler(logger):
+        fh = logging.FileHandler('./BasicSettingLog.log', mode='a')
+        fh.setLevel(logging.DEBUG)  # 输出到file的log等级的开关
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
