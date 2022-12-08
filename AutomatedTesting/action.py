@@ -126,14 +126,14 @@ class InstallSoftware(object):
         if result["st"]:
             return True
 
-    def install_vplx(self):
-        result = utils.upload_file("vplx", "/tmp", self.conn)
-        if result["st"]:
-            # cmd_pip = f'pip3 install -r /tmp/vplx/requirements.txt'
-            # result_pip = utils.exec_cmd(cmd_pip, self.conn)
-            # if not result_pip["st"]:
-            #     print("Please install python module on /tmp/requirements.txt")
-            return True
+    # def install_vplx(self):
+    #     result = utils.upload_file("vplx", "/tmp", self.conn)
+    #     if result["st"]:
+    #         # cmd_pip = f'pip3 install -r /tmp/vplx/requirements.txt'
+    #         # result_pip = utils.exec_cmd(cmd_pip, self.conn)
+    #         # if not result_pip["st"]:
+    #         #     print("Please install python module on /tmp/requirements.txt")
+    #         return True
 
 
 class Stor(object):
@@ -167,47 +167,49 @@ class Stor(object):
             return True
 
     def create_node(self, node, ip):
-        cmd = f'python3 /tmp/vplx/vtel.py stor n c {node} -ip {ip}  -nt Combined'
+        cmd = f'linstor n c {node} {ip} --node-type Combined'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            return self.check_vtel_result(result["rt"])
+            return result["rt"]
 
     def create_sp(self, node, sp, lvm_device):
-        cmd = f'python3 /tmp/vplx/vtel.py stor sp c {sp}  -n {node} -lvm {lvm_device}'
+        cmd = f'linstor sp c lvm {node} {sp} {lvm_device}'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            return self.check_vtel_result(result["rt"])
+            return result["rt"]
 
     def create_diskful_resource(self, node_list, sp, size, resource):
-        node = " ".join(node_list)
-        cmd = f'python3 /tmp/vplx/vtel.py stor r c {resource} -s {size} -n {node} -sp {sp}'
-        result = utils.exec_cmd(cmd, self.conn)
-        if result["st"]:
-            return self.check_vtel_result(result["rt"])
+        cmd_rd = f'linstor rd c {resource}'
+        utils.exec_cmd(cmd_rd, self.conn)
+        cmd_vd = f'linstor vd c {resource} {size}'
+        utils.exec_cmd(cmd_vd, self.conn)
+        for node in node_list:
+            cmd = f'linstor r c {node} {resource} --storage-pool {sp}'
+            utils.exec_cmd(cmd, self.conn)
 
     def create_diskless_resource(self, node, resource):
-        cmd = f'python3 /tmp/vplx/vtel.py stor r c {resource} -diskless -n {node}'
+        cmd = f'linstor r c {node} {resource} --diskless'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            return self.check_vtel_result(result["rt"])
+            return result["rt"]
 
     def delete_resource(self, resource):
-        cmd = f'python3 /tmp/vplx/vtel.py stor r d {resource} -y'
+        cmd = f'linstor rd d {resource}'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            return self.check_vtel_result(result["rt"])
+            return result["rt"]
 
     def delete_sp(self, node, sp):
-        cmd = f'python3 /tmp/vplx/vtel.py stor sp d {sp} -n {node} -y'
+        cmd = f'linstor sp d {node} {sp}'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            return self.check_vtel_result(result["rt"])
+            return result["rt"]
 
     def delete_node(self, node):
-        cmd = f'python3 /tmp/vplx/vtel.py stor n d {node} -y'
+        cmd = f'linstor n d {node}'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            return self.check_vtel_result(result["rt"])
+            return result["rt"]
 
     def get_device_name(self, resource):
         cmd = f'linstor r lv -r {resource}'
@@ -223,10 +225,10 @@ class Stor(object):
         if result["st"]:
             return result["rt"]
 
-    def check_vtel_result(self, result):
-        re_string = f'SUCCESS|successfully created'
-        re_result = utils.re_search(self.conn, re_string, result, "bool")
-        return re_result
+    # def check_vtel_result(self, result):
+    #     re_string = f'SUCCESS|successfully created'
+    #     re_result = utils.re_search(self.conn, re_string, result, "bool")
+    #     return re_result
 
 
 class Iscsi(object):
