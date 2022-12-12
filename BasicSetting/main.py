@@ -116,10 +116,14 @@ class InputParser(object):
                                           help='Password of current user',
                                           action='store')
 
-        self.parser_nm = subp.add_parser('intsall nm',
-                                          help='Install network-manager and set network-manager')
         self.parser_nm = isubp.add_parser('nm',
                                           help='Install network-manager and set network-manager ')
+
+        self.parser_nm.add_argument('-p',
+                                      '--password',
+                                      dest='password',
+                                      help='Password of current user',
+                                      action='store')
 
         self.parser_build.set_defaults(func=self.run_func)
         # self.parser_ip.set_defaults(func=self.ip_func)
@@ -157,6 +161,8 @@ class InputParser(object):
         if type == "hostname":
             self.check_hostname_format(args)
             self.collect_hostname_args(args)
+        else:
+            pass
         password = args.password
         # password = args.password if args.password else utils.guide_check("User password", "password")
         if os.geteuid() != 0:
@@ -185,9 +191,8 @@ class InputParser(object):
         control.set_hostname(self.conf_args)
 
     def install_nm_func(self, args):
-        print("start install network-manager")
-        if action.InstallSoftware().install_software("network-manager"):
-            control.set_nmcli_config()
+        self.collect_args(args, "nm")
+        control.install_nm(self.conf_args)
 
     def check_ip_gateway_format(self, args):
         if args.ip:

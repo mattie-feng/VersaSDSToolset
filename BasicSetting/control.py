@@ -29,6 +29,19 @@ def set_nmcli_config():
                     return True
 
 
+def install_nm(conf_args):
+    install = action.InstallSoftware()
+    print("\nPrepare to install software...")
+    if install.update_apt():
+        print("Start to install network-manager")
+        if install.install_software("network-manager"):
+            print(" Start to set network-manager config")
+            set_nmcli_config()
+        print("\n")
+    else:
+        sys.exit()
+
+
 def all_deploy(conf_args):
     """一键执行完成软件安装以及配置、root密码设置、允许以root用户登录、连接IP的设置的功能"""
     install = action.InstallSoftware()
