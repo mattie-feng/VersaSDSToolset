@@ -189,7 +189,7 @@ class QuorumAutoTest(object):
         # TODO 可优化，使用 LINSTOR API 代码
         install_obj = action.InstallSoftware(vtel_conn)
         # install_obj.update_pip()
-        install_obj.install_vplx()
+        # install_obj.install_vplx()
 
         self.create_linstor_resource(vtel_conn, sp, resource)
 
