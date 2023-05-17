@@ -94,7 +94,8 @@ class Corosync(object):
         self.conn = conn
 
     def sync_time(self):
-        cmd = 'ntpdate -u ntp.api.bz'
+        # Use chrony instead of ntpdate as it is a more modern NTP client and server
+        cmd = 'chronyc -a makestep'
         utils.exec_cmd(cmd, self.conn)
 
     def change_corosync_conf(self, cluster_name, bindnetaddr_list, interface, nodelist):
@@ -206,7 +207,7 @@ class Pacemaker(object):
         return True
 
     def install(self):
-        cmd = 'apt install -y pacemaker crmsh corosync ntpdate'
+        cmd = 'apt install -y pacemaker crmsh corosync chrony'
         utils.exec_cmd(cmd, self.conn)
 
     def get_version(self):
@@ -237,7 +238,7 @@ class Pacemaker(object):
         utils.exec_cmd(f"crm conf del {node}", self.conn)
 
     def uninstall(self):
-        cmd = 'apt purge -y pacemaker crmsh corosync ntpdate'
+        cmd = 'apt purge -y pacemaker crmsh corosync chrony'
         utils.exec_cmd(cmd, self.conn)
 
     def set_vip(self, ip):
