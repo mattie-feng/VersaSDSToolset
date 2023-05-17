@@ -719,7 +719,8 @@ class LVM(object):
         self.conn = conn
 
     def pv_create(self, disk):
-        cmd = f'pvcreate {disk}'
+        # create physical volume
+        cmd = f'pvcreate {disk} -y'
         result = utils.exec_cmd(cmd, self.conn)
         if 'successfully created' in result:
             return True
