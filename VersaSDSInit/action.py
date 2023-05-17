@@ -333,6 +333,8 @@ class ServiceSet(object):
         cmd = f'systemctl is-enabled {name}'
         result = utils.exec_cmd(cmd, self.conn)
         if 'No such file or directory' in result:
+            if name == "drbd":
+                return 'disabled'
             return
         if name == "rtslib-fb-targetctl":
             if 'disabled' in result:
