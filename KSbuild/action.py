@@ -113,7 +113,7 @@ class VersaKBS(object):
         else:
             utils.exec_cmd("apt install -y docker-ce", self.conn)
         utils.exec_cmd("apt install -y socat conntrack", self.conn)
-        utils.exec_cmd("apt install -y ntpdate", self.conn)
+        utils.exec_cmd("apt install -y chrony", self.conn)
 
     def install_kk(self):
         utils.exec_cmd("export KKZONE=cn && curl -sfL https://get-kk.kubesphere.io | sh -", self.conn)
@@ -150,7 +150,8 @@ class VersaSDS(object):
         self.conn = conn
 
     def sync_time(self):
-        cmd = 'ntpdate -u ntp.api.bz'
+        # Use chrony instead of ntpdate as it is a more modern NTP client and server
+        cmd = 'chronyc -a makestep'
         utils.exec_cmd(cmd, self.conn)
 
     # TODO
