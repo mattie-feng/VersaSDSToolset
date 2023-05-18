@@ -5,6 +5,7 @@ import sys
 import time
 import re
 
+
 def exec_cmd(cmd, conn=None):
     if conn:
         result = conn.exec_cmd(cmd)
@@ -15,6 +16,7 @@ def exec_cmd(cmd, conn=None):
     if result:
         result = result.rstrip('\n')
     return result
+
 
 class SSHConn(object):
 
@@ -28,6 +30,7 @@ class SSHConn(object):
         self.ssh_connect()
 
     def _connect(self):
+        # TODO: 异常处理应该更加具体，以便更好地了解连接失败的原因
         try:
             objSSHClient = paramiko.SSHClient()
             objSSHClient.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -48,6 +51,7 @@ class SSHConn(object):
                 sys.exit()
 
     def exec_cmd(self, command):
+        # TODO: 如果发生错误，应该返回错误消息，而不是返回False
         if self.SSHConnection:
             stdin, stdout, stderr = self.SSHConnection.exec_command(command)
             data = stdout.read()
@@ -59,7 +63,8 @@ class SSHConn(object):
                 err = err.decode() if isinstance(err, bytes) else err
                 return False
 
-    def exec_copy_id_rsa_pub(self,target_ip,passwd):
+    def exec_copy_id_rsa_pub(self, target_ip, passwd):
+        # TODO: 应该添加更多的错误处理，以便在发生错误时能够更好地了解问题所在
         cmd = f'ssh-copy-id -o stricthostkeychecking=no -i /root/.ssh/id_rsa.pub root@{target_ip}'
         conn = self.SSHConnection.invoke_shell()
         conn.keep_this = self.SSHConnection
@@ -69,7 +74,7 @@ class SSHConn(object):
         time.sleep(2)
         stdout = conn.recv(1024)
         info = stdout.decode()
-        result = re.findall(r'Number of key(s) added: 1',info)
+        result = re.findall(r'Number of key(s) added: 1', info)
         if result == []:
             time.sleep(2)
             conn.send(passwd + '\n')
