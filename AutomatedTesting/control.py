@@ -313,10 +313,16 @@ class QuorumAutoTest(object):
         utils.prt_log(conn, f"Start to create resource {resource} ...", 0)
         if use_case == 1:
             diskless_node = diskful_node_list.pop()
-            stor_obj.create_diskful_resource(diskful_node_list, sp, size, resource)
+            stor_obj.create_rd(resource)
+            stor_obj.creare_vd(resource,size)
+            stor_obj.create_diskful_resource(diskful_node_list, sp, resource)
             stor_obj.create_diskless_resource(diskless_node, resource)
+            stor_obj.check_resource()
         if use_case == 2:
-            stor_obj.create_diskful_resource(diskful_node_list, sp, size, resource)
+            stor_obj.create_rd(resource)
+            stor_obj.creare_vd(resource,size)
+            stor_obj.create_diskful_resource(diskful_node_list, sp, resource)
+            stor_obj.check_resource()
         time.sleep(15)
 
     def delete_linstor_resource(self, conn, sp, resource):
