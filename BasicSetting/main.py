@@ -4,7 +4,6 @@ import sys
 import os
 import control
 import utils
-import action
 
 sys.path.append('../')
 import consts
@@ -120,10 +119,10 @@ class InputParser(object):
                                           help='Install network-manager and set network-manager ')
 
         self.parser_nm.add_argument('-p',
-                                      '--password',
-                                      dest='password',
-                                      help='Password of current user',
-                                      action='store')
+                                    '--password',
+                                    dest='password',
+                                    help='Password of current user',
+                                    action='store')
 
         self.parser_build.set_defaults(func=self.run_func)
         # self.parser_ip.set_defaults(func=self.ip_func)
