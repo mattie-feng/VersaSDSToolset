@@ -1,4 +1,5 @@
 import utils
+import re
 
 
 class RWData(object):
@@ -178,11 +179,15 @@ class Stor(object):
         if result["st"]:
             return result["rt"]
 
-    def create_diskful_resource(self, node_list, sp, size, resource):
+    def create_rd(self,resource):
         cmd_rd = f'linstor rd c {resource}'
         utils.exec_cmd(cmd_rd, self.conn)
+
+    def creare_vd(self,resource,size):
         cmd_vd = f'linstor vd c {resource} {size}'
         utils.exec_cmd(cmd_vd, self.conn)
+
+    def create_diskful_resource(self, node_list, sp, resource):
         for node in node_list:
             cmd = f'linstor r c {node} {resource} --storage-pool {sp}'
             utils.exec_cmd(cmd, self.conn)
@@ -192,6 +197,22 @@ class Stor(object):
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
             return result["rt"]
+
+    def create_crm_conf(self,crm_lincontrl_config):
+        cmd = f'crm config load update {crm_lincontrl_config}'
+        result = utils.exec_cmd(cmd, self.conn)
+        cmd1 = f'crm res start vip p_iscsi_portblock_on p_iscsi_portblock_off t_test r0 g_linstor p_fs_linstordb p_linstor-controller  p_drbd_linstordb'
+        utils.exec_cmd(cmd1,self.conn)
+
+    def check_resource(self):
+        cmd = "linstor r l"
+        result = utils.exec_cmd(cmd,self.conn)
+        a = re.findall(r'resourcetest01', result)
+        b = re.findall(r'TieBreaker', result)
+        if len(a) == 3 and b == []:
+            print("Resource created successfully")
+        else:
+            print("Resource creation failed")
 
     def delete_resource(self, resource):
         cmd = f'linstor rd d {resource}'
