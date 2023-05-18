@@ -5,22 +5,46 @@ import subprocess
 import yaml
 import sys
 import re
+import socket
+import logging
+
+
+def get_host_ip():
+    """
+    查询本机ip地址
+    :return: ip
+    """
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+    finally:
+        s.close()
+
+    return ip
 
 
 def exec_cmd(cmd, conn=None):
     if conn:
         result = conn.exec_cmd(cmd)
+        log_data = f'{conn._host} - {cmd} - {result}'
+        Log().logger.info(log_data)
         return result
     else:
         p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, encoding="utf-8")
         if p.returncode == 0:
             result = p.stdout
             result = result.decode() if isinstance(result, bytes) else result
+            log_data = f'localhost - {cmd} - {result}'
+            Log().logger.info(log_data)
             return {"st": True, "rt": result}
         else:
             result = p.stderr
             result = result.decode() if isinstance(result, bytes) else result
+            log_data = f'localhost - {cmd} - {result}'
+            Log().logger.info(log_data)
             return {"st": False, "rt": result}
+
 
 
 def check_mode(mode):
@@ -72,7 +96,7 @@ class SSHConn(object):
     def ssh_connect(self):
         self._connect()
         if not self.SSHConnection:
-            print(f'Connect retry for {self._host}')
+            print(f'Connect retry for {self._host} ...')
             self._connect()
             if not self.SSHConnection:
                 sys.exit()
@@ -90,17 +114,17 @@ class SSHConn(object):
                 return {"st": True, "rt": data}
 
 
-def get_hostname():
-    """
-    查询本机hostname
-    :return:
-    """
-    # local_hostname = os.popen('hostname').read()
-    local_hostname = os.popen('hostname').read().strip('\n')
-    return local_hostname
+# def get_hostname():
+#     """
+#     查询本机hostname
+#     :return:
+#     """
+#     # local_hostname = os.popen('hostname').read()
+#     local_hostname = os.popen('hostname').read().strip('\n')
+#     return local_hostname
 
 
-class ConfFile():
+class ConfFile(object):
     def __init__(self, file):
         self.yaml_file = file
         self.config = self.read_yaml()
@@ -118,19 +142,40 @@ class ConfFile():
             print("Error in the type of file name.")
             sys.exit()
 
-    def update_yaml(self):
-        """更新文件内容"""
-        with open(self.yaml_file, 'w', encoding='utf-8') as f:
-            yaml.dump(self.cluster, f, default_flow_style=False)
+    # def update_yaml(self):
+    #     """更新文件内容"""
+    #     with open(self.yaml_file, 'w', encoding='utf-8') as f:
+    #         yaml.dump(self.cluster, f, default_flow_style=False)
 
     def get_config(self):
-        lst = []
-        for host_config in self.config["node"]:
-            if check_mode(host_config['mode']) and check_ip(host_config['ip']):
-                lst.append(
-                    [host_config['hostname'], host_config['bond'], host_config['mode'], host_config['device'],
-                     host_config['ip']])
-            else:
-                print(f"Please check the config of {host_config['hostname']}")
+        for host_config in self.config["bond"]:
+            if not check_mode(host_config['mode']):
+                print(f"Please check the mode config of {host_config['node']}")
                 sys.exit()
-        return lst
+            if not check_ip(host_config['ip']):
+                print(f"Please check the ip config of {host_config['node']}")
+                sys.exit()
+            if len(host_config["device"]) != 2:
+                print(f"Please check the ip config of {host_config['node']}. Number of bond devices must be 2")
+                sys.exit()
+        return self.config["bond"]
+
+class Log(object):
+    def __init__(self):
+        pass
+
+    def __new__(cls, *args, **kwargs):
+        if not hasattr(cls, '_instance'):
+            Log._instance = super().__new__(cls)
+            Log._instance.logger = logging.getLogger()
+            Log._instance.logger.setLevel(logging.INFO)
+            Log.set_handler(Log._instance.logger)
+        return Log._instance
+
+    @staticmethod
+    def set_handler(logger):
+        fh = logging.FileHandler('./IPToolLog.log', mode='a')
+        fh.setLevel(logging.DEBUG)  # 输出到file的log等级的开关
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)

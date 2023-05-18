@@ -10,17 +10,17 @@ class RWData(object):
         utils.prt_log(self.conn, f"Start dd on {utils.get_global_dict_value(self.conn)}.", 0)
         utils.exec_cmd(cmd, self.conn)
 
-    def kill_dd(self, device):
-        cmd_ps = 'ps -ef | grep dd'
-        result = utils.exec_cmd(cmd_ps, self.conn)
-        re_string = f'\w*\s*(\d+)\s*.*dd if=/dev/urandom of={device} oflag=direct status=progress'
+    def get_dd(self):
+        cmd = 'ps -ef | grep dd'
+        result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            re_result = utils.re_search(re_string, result["rt"], "groups")
-            if re_result:
-                pid = re_result[0]
-                cmd_kill = f'kill -9 {pid}'
-                utils.exec_cmd(cmd_kill, self.conn)
-                utils.prt_log(self.conn, f"Kill dd on {utils.get_global_dict_value(self.conn)}.", 0)
+            return result["rt"]
+
+    def kill_dd(self, pid):
+        cmd = f'kill -9 {pid}'
+        result = utils.exec_cmd(cmd, self.conn)
+        if result["st"]:
+            return True
 
 
 class IpService(object):
@@ -29,21 +29,23 @@ class IpService(object):
 
     def down_device(self, device):
         cmd = f"ifconfig {device} down"
+        # cmd = f"nmcli device disconnect {device}"
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
             return True
 
     def up_device(self, device):
-        cmd = f"ifconfig {device} up"
+        # cmd = f"ifconfig {device} up"
+        cmd = f"nmcli device connect {device}"
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
             return True
 
-    def netplan_apply(self):
-        cmd = "netplan apply"
-        result = utils.exec_cmd(cmd, self.conn)
-        if result["st"]:
-            return True
+    # def netplan_apply(self):
+    #     cmd = "netplan apply"
+    #     result = utils.exec_cmd(cmd, self.conn)
+    #     if result["st"]:
+    #         return True
 
 
 class DebugLog(object):
@@ -124,14 +126,14 @@ class InstallSoftware(object):
         if result["st"]:
             return True
 
-    def install_vplx(self):
-        result = utils.upload_file("vplx", "/tmp", self.conn)
-        if result["st"]:
-            # cmd_pip = f'pip3 install -r /tmp/vplx/requirements.txt'
-            # result_pip = utils.exec_cmd(cmd_pip, self.conn)
-            # if not result_pip["st"]:
-            #     print("Please install python module on /tmp/requirements.txt")
-            return True
+    # def install_vplx(self):
+    #     result = utils.upload_file("vplx", "/tmp", self.conn)
+    #     if result["st"]:
+    #         # cmd_pip = f'pip3 install -r /tmp/vplx/requirements.txt'
+    #         # result_pip = utils.exec_cmd(cmd_pip, self.conn)
+    #         # if not result_pip["st"]:
+    #         #     print("Please install python module on /tmp/requirements.txt")
+    #         return True
 
 
 class Stor(object):
@@ -149,7 +151,7 @@ class Stor(object):
         result = utils.exec_cmd(cmd, self.conn)
         re_string = 'quorum\s+majority.*\s*on\s*-\s*no\s*-\s*quorum\s+io\s*-\s*error'
         if result["st"]:
-            re_result = utils.re_search(re_string, result["rt"], "bool")
+            re_result = utils.re_search(self.conn, re_string, result["rt"], "bool")
             return re_result
 
     def primary_drbd(self, resource):
@@ -165,54 +167,56 @@ class Stor(object):
             return True
 
     def create_node(self, node, ip):
-        cmd = f'python3 /tmp/vplx/vtel.py stor n c {node} -ip {ip}  -nt Combined'
+        cmd = f'linstor n c {node} {ip} --node-type Combined'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            return self.check_vtel_result(result["rt"])
+            return result["rt"]
 
     def create_sp(self, node, sp, lvm_device):
-        cmd = f'python3 /tmp/vplx/vtel.py stor sp c {sp}  -n {node} -lvm {lvm_device}'
+        cmd = f'linstor sp c lvm {node} {sp} {lvm_device}'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            return self.check_vtel_result(result["rt"])
+            return result["rt"]
 
     def create_diskful_resource(self, node_list, sp, size, resource):
-        node = " ".join(node_list)
-        cmd = f'python3 /tmp/vplx/vtel.py stor r c {resource} -s {size} -n {node} -sp {sp}'
-        result = utils.exec_cmd(cmd, self.conn)
-        if result["st"]:
-            return self.check_vtel_result(result["rt"])
+        cmd_rd = f'linstor rd c {resource}'
+        utils.exec_cmd(cmd_rd, self.conn)
+        cmd_vd = f'linstor vd c {resource} {size}'
+        utils.exec_cmd(cmd_vd, self.conn)
+        for node in node_list:
+            cmd = f'linstor r c {node} {resource} --storage-pool {sp}'
+            utils.exec_cmd(cmd, self.conn)
 
     def create_diskless_resource(self, node, resource):
-        cmd = f'python3 /tmp/vplx/vtel.py stor r c {resource} -diskless -n {node}'
+        cmd = f'linstor r c {node} {resource} --diskless'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            return self.check_vtel_result(result["rt"])
+            return result["rt"]
 
     def delete_resource(self, resource):
-        cmd = f'python3 /tmp/vplx/vtel.py stor r d {resource} -y'
+        cmd = f'linstor rd d {resource}'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            return self.check_vtel_result(result["rt"])
+            return result["rt"]
 
     def delete_sp(self, node, sp):
-        cmd = f'python3 /tmp/vplx/vtel.py stor sp d {sp} -n {node} -y'
+        cmd = f'linstor sp d {node} {sp}'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            return self.check_vtel_result(result["rt"])
+            return result["rt"]
 
     def delete_node(self, node):
-        cmd = f'python3 /tmp/vplx/vtel.py stor n d {node} -y'
+        cmd = f'linstor n d {node}'
         result = utils.exec_cmd(cmd, self.conn)
         if result["st"]:
-            return self.check_vtel_result(result["rt"])
+            return result["rt"]
 
     def get_device_name(self, resource):
         cmd = f'linstor r lv -r {resource}'
         result = utils.exec_cmd(cmd, self.conn)
         re_string = '/dev/drbd\d+'
         if result["st"]:
-            re_result = utils.re_search(re_string, result["rt"], "group")
+            re_result = utils.re_search(self.conn, re_string, result["rt"], "group")
             return re_result
 
     def get_linstor_res(self, resource):
@@ -221,10 +225,10 @@ class Stor(object):
         if result["st"]:
             return result["rt"]
 
-    def check_vtel_result(self, result):
-        re_string = f'SUCCESS|successfully created'
-        re_result = utils.re_search(re_string, result, "bool")
-        return re_result
+    # def check_vtel_result(self, result):
+    #     re_string = f'SUCCESS|successfully created'
+    #     re_result = utils.re_search(self.conn, re_string, result, "bool")
+    #     return re_result
 
 
 class Iscsi(object):
