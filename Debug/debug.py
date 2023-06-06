@@ -6,6 +6,7 @@ import paramiko
 import yaml
 import socket
 import argparse
+import os
 
 
 def exec_cmd(cmd, conn=None):
@@ -67,14 +68,26 @@ def show_tree_all(path, ssh_obj=None):
     return exec_cmd(cmd, ssh_obj)
 
 
-def show_tree(path, node, soft=None, ssh_obj=None):
+def show_tree(path, node, soft=None, ssh_obj=None, depth=0):
     if soft:
         softpath = ""
         for s in soft:
             softpath += f" {node}/{s}"
-        cmd = f"cd {path} && tree -a {softpath} -L 4"
+        # cmd = f"cd {path} && tree -a {softpath} -L 4"
+        for item in os.listdir(path):
+            print("| " * depth + "--" + item)
+
+            newitem = path + '/' + item
+            if os.path.isdir(newitem):
+                show_tree(newitem, depth + 1)
     else:
-        cmd = f"cd {path} && tree -a {node} -L 4"
+        # cmd = f"cd {path} && tree -a {node} -L 4"
+        for item in os.listdir(path):
+            print("| " * depth + "--" + item)
+
+            newitem = path + '/' + item
+            if os.path.isdir(newitem):
+                show_tree(newitem, depth + 1)
     return exec_cmd(cmd, ssh_obj)
 
 

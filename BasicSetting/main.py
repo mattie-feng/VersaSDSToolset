@@ -27,6 +27,8 @@ class InputParser(object):
                                  action='store_true')
 
         self.parser_build = subp.add_parser("build", aliases=['b'], help="Install software and set basic configuration")
+        self.parser_install = subp.add_parser("install", aliases=['i'], help="Install software")
+        isubp = self.parser_install.add_subparsers()
 
         self.parser_build.add_argument('-ip',
                                        '--ip',
@@ -113,10 +115,20 @@ class InputParser(object):
                                           help='Password of current user',
                                           action='store')
 
+        self.parser_nm = isubp.add_parser('nm',
+                                          help='Install network-manager and set network-manager ')
+
+        self.parser_nm.add_argument('-p',
+                                    '--password',
+                                    dest='password',
+                                    help='Password of current user',
+                                    action='store')
+
         self.parser_build.set_defaults(func=self.run_func)
         # self.parser_ip.set_defaults(func=self.ip_func)
         self.parser_root.set_defaults(func=self.root_func)
         self.parser_hostname.set_defaults(func=self.hostname_func)
+        self.parser_nm.set_defaults(func=self.install_nm_func)
         self.parser.set_defaults(func=self.help_usage)
 
     def collect_ip_args(self, args):
@@ -148,6 +160,8 @@ class InputParser(object):
         if type == "hostname":
             self.check_hostname_format(args)
             self.collect_hostname_args(args)
+        else:
+            pass
         password = args.password
         # password = args.password if args.password else utils.guide_check("User password", "password")
         if os.geteuid() != 0:
@@ -174,6 +188,10 @@ class InputParser(object):
     def hostname_func(self, args):
         self.collect_args(args, "hostname")
         control.set_hostname(self.conf_args)
+
+    def install_nm_func(self, args):
+        self.collect_args(args, "nm")
+        control.install_nm(self.conf_args)
 
     def check_ip_gateway_format(self, args):
         if args.ip:

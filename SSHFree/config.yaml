@@ -1,0 +1,13 @@
+node:
+  - name: test01
+    ip: 10.203.1.249
+    username: root
+    password: password
+  - name: test02
+    ip: 10.203.1.111
+    username: root
+    password: password
+  - name: test03
+    ip: 10.203.1.238
+    username: root
+    password: password

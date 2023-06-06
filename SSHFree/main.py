@@ -1,0 +1,115 @@
+import sys
+import time
+import operation
+import utils
+import argparse
+
+sys.path.append('../')
+import consts
+
+
+class ArgparseOperator:
+    def __init__(self):
+        self.parser = argparse.ArgumentParser(prog='argparse')
+        self.setup_parse()
+
+    def setup_parse(self):
+        sub_parser = self.parser.add_subparsers()
+
+        self.parser.add_argument('-v',
+                                 '--version',
+                                 dest='version',
+                                 help='Show current version',
+                                 action='store_true')
+
+        self.parser.set_defaults(func=self.main_usage)
+
+        parser_free = sub_parser.add_parser("free", aliases=['fe'], help='free_login')
+
+        parser_re_free = sub_parser.add_parser("re", aliases=['re'], help='re_free_login')
+
+        parser_free.set_defaults(func=self.func_free_login)
+        parser_re_free.set_defaults(func=self.func_re_free_login)
+
+    def main_usage(self, args):
+        if args.version:
+            print(f'Version: {consts.VERSION}')
+            sys.exit()
+        else:
+            self.parser.print_help()
+
+    def parser_init(self):
+        args = self.parser.parse_args()
+        args.func(args)
+
+    def func_free_login(self, args):
+        free_login()
+
+    def func_re_free_login(self, args):
+        re_free_login()
+
+
+def free_login():
+    config_info = operation.read_config('config.yaml')
+    node_list = config_info['node']
+    # TODO: 可以使用 concurrent.futures 模块来并行执行循环中的任务，以提高效率
+    for z in node_list:
+        name = z['name']
+        ipaddr = z['ip']
+        usname = z['username']
+        passwd = z['password']
+        ssh_obj = utils.SSHConn(host=ipaddr, username=usname, password=passwd)
+        status0 = operation.revise_sshd_config(ssh_obj)
+        status1 = operation.check_id_rsa_pub(ssh_obj)
+        if status1 is False:
+            print(f'{ipaddr} does not have a public key, creating one now')
+            status2 = operation.create_id_rsa_pub(ssh_obj)
+            time.sleep(2)
+            if status2 is False:
+                print('Failed to create public key')
+                sys.exit()
+            else:
+                print('Public key created successfully')
+        else:
+            print(f'{ipaddr} has a public key')
+
+    for i, z in enumerate(node_list):
+        name = z['name']
+        ipaddr = z['ip']
+        usname = z['username']
+        passwd = z['password']
+        ssh_obj = utils.SSHConn(host=ipaddr, username=usname, password=passwd)
+        exec(f'list{i} = {node_list}')
+        exec(f'list{i}.remove({z})')
+        print(f'Now distributing public key for {ipaddr}')
+        try:
+            exec(f'for y in list{i}:'
+                 f'    ssh_obj.exec_copy_id_rsa_pub(y["ip"],y["password"])')
+            print(f'Public key distribution for {ipaddr} completed')
+        except:
+            print('Failed to distribute public key, program will exit automatically')
+            sys.exit()
+
+
+def re_free_login():
+    config_info = operation.read_config('config.yaml')
+    node_list = config_info['node']
+    for z in node_list:
+        name = z['name']
+        ipaddr = z['ip']
+        usname = z['username']
+        passwd = z['password']
+        print(f'Now removing password-free operation for {ipaddr}')
+        ssh_obj = utils.SSHConn(host=ipaddr, username=usname, password=passwd)
+        status0 = operation.check_authorized_keys(ssh_obj)
+        try:
+            delete_cmd = "rm /root/.ssh/authorized_keys"
+            utils.exec_cmd(delete_cmd, ssh_obj)
+            print("Password-free operation removed successfully")
+        except:
+            print("Failed to remove password-free operation")
+
+
+if __name__ == "__main__":
+    cmd = ArgparseOperator()
+    cmd.parser_init()
